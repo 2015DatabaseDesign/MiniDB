@@ -151,6 +151,7 @@
     <ClInclude Include="CatalogManager.h" />
     <ClInclude Include="Data.h" />
     <ClInclude Include="datatype.h" />
+    <ClInclude Include="DB_Interpreter.h" />
     <ClInclude Include="MiniDB.h" />
     <ClInclude Include="mystr.h" />
     <ClInclude Include="RecordManager.h" />
@@ -160,6 +161,7 @@
     <ClCompile Include="BufferManager.cpp" />
     <ClCompile Include="CatalogManager.cpp" />
     <ClCompile Include="Data.cpp" />
+    <ClCompile Include="DB_Interpreter.cpp" />
     <ClCompile Include="MiniDB.cpp" />
     <ClCompile Include="mystr.cpp" />
     <ClCompile Include="RecordManager.cpp" />
