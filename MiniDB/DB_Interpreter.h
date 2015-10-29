@@ -46,17 +46,18 @@
 #include "string"
 #include "map"
 #include "vector"
+#include <regex>
 
 using namespace std;
 typedef unsigned char byte;
 
 static map<string, int> OperMap = {
-	map<string, int>::value_type("=", 0),
-	map<string, int>::value_type("<>", 1),
-	map<string, int>::value_type("<", 2),
-	map<string, int>::value_type(">", 3),
-	map<string, int>::value_type("<=", 4),
-	map<string, int>::value_type(">=", 5),
+	map<string, int>::value_type("=", 1),
+	map<string, int>::value_type("<>", 2),
+	map<string, int>::value_type("<", 3),
+	map<string, int>::value_type(">", 4),
+	map<string, int>::value_type("<=", 5),
+	map<string, int>::value_type(">=", 6),
 };
 /**
 * \class	IllegalCommand
@@ -162,31 +163,23 @@ public:
 
 	string read_input();
 
-	void Interpreter(string statement); /*command interpreting, return state*/
-	void create_clause(string SQL);
+	sql_node Interpreter(string statement); /*command interpreting, return state*/
+	sql_node create_clause(string SQL);
 	sql_node create_database(smatch);
 	sql_node create_table(smatch);
 	sql_node create_index(smatch);
 
-	void drop_clause(string SQL);
-	void drop_database(string SQL);
-	void drop_table(string SQL);
-	void drop_index(string SQL);
+	sql_node drop_clause(string SQL);
 
-	void select_clause(string SQL);
+	sql_node select_clause(string SQL);
 
-	void insert_clause(string SQL);
+	sql_node insert_clause(string SQL);
 
-	void delete_clause(string SQL);
-	void delete_from_where(string SQL);
+	sql_node delete_clause(string SQL);
 
-	void use_clause(string SQL);
+	sql_node use_clause(string SQL);
 
-	void execfile_clause(string SQL);
-
-	void quit_clause(string SQL);
-
-	void get_expression(string SQL_CMD);
+	sql_node execfile_clause(string SQL);
 
 	void DBhelp();
 };
@@ -194,4 +187,6 @@ public:
 
 void bin_show(byte);
 void argu_show(size_t, char **);
-void split(const string&, const string&, vector<string>&);
+bool cond_func(string, char **, size_t &, byte &);
+bool attr_func(string, char **, size_t &);
+void split(const string &, const string &, vector<string> &);

@@ -18,7 +18,7 @@ using namespace std;
 */
 
 #define MAXLENGTH	20
-#define MAXNUM		100
+#define MAXNUM		50
 
 /**
 * \fn	string DB_interpreter::read_input()
@@ -73,7 +73,7 @@ string DB_interpreter::read_input() {
 * \param	statement	The statement.
 */
 
-void DB_interpreter::Interpreter(string statement) {
+sql_node DB_interpreter::Interpreter(string statement) {
 	smatch cap_str;
 	statement = toLower(statement);
 
@@ -92,12 +92,12 @@ void DB_interpreter::Interpreter(string statement) {
 
 		// function switch
 		switch (type) {
-		case CREATE: create_clause(statement); break;
-		case INSERT: insert_clause(statement); break;
-		case DROP: drop_clause(statement); break;
-		case SELECT: select_clause(statement); break;
-		case DELETE: cout << "delete" << endl; break;
-		case USE: cout << "use" << endl; break;
+		case CREATE: return create_clause(statement); break;
+		case INSERT: return insert_clause(statement); break;
+		case DROP: return drop_clause(statement); break;
+		case SELECT: return select_clause(statement); break;
+		case DELETE: return delete_clause(statement); break;
+		case USE: return use_clause(statement); break;
 		default:
 			throw IllegalCommand(UndefinedCMD);
 		}
@@ -108,18 +108,8 @@ void DB_interpreter::Interpreter(string statement) {
 }
 
 
-/**
-* \fn	void DB_interpreter::create_clause(string SQL)
-*
-* \brief	Create Clause.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	SQL	The SQL.
-*/
 
-void DB_interpreter::create_clause(string SQL) {
+sql_node DB_interpreter::create_clause(string SQL) {
 	sql_node node;
 	/**
 	* 'create' grammar
@@ -131,7 +121,7 @@ void DB_interpreter::create_clause(string SQL) {
 	/***************************************************************************************************/
 	/*     create	table|database|index	name	(table_info);|;|on tablename (attribute_info);     */
 	/***************************************************************************************************/
-	const regex create_split("^\\s*create\\s+(\\w+)\\s(\\w+)(?:(?:\\s*\\((.+)\\))|(?:\\s+on\\s+(\\w+)\\s*\\(([^)]+)\\)))?\\s*;\\s*");
+	const regex create_split("^\\s*create\\s+(\\w+)\\s(\\w+)(?:(?:\\s*\\(\\s*(.+)\\s*\\))|(?:\\s+on\\s+(\\w+)\\s*\\(([^)]+)\\)))?\\s*;\\s*");
 	// split SQL statement
 	if (regex_match(SQL, create_match, create_split)) {
 		map<string, int>::iterator iter = str_map.find(string(create_match[1]));
@@ -141,7 +131,7 @@ void DB_interpreter::create_clause(string SQL) {
 		else {
 			throw IllegalCommand(UndefinedCMD);
 		}
-		cout << create_match[1] << "*" << create_match[2] << "*" << create_match[3] << "*" << create_match[4] << "*" << create_match[5] << "*" << endl;
+		// cout << create_match[1] << "*" << create_match[2] << "*" << create_match[3] << "*" << create_match[4] << "*" << create_match[5] << "*" << endl;
 		// 'create' function switch
 		switch (type) {
 		case TABLE: node = create_table(create_match); break;
@@ -157,20 +147,9 @@ void DB_interpreter::create_clause(string SQL) {
 	Call API
 	*/
 	cout << "done" << endl;
+	return node;
 }
 
-/**
-* \fn	sql_node DB_interpreter::create_database(smatch cmd_match)
-*
-* \brief	Creates a database.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	cmd_match	A match specifying the command.
-*
-* \return	The new database.
-*/
 
 sql_node DB_interpreter::create_database(smatch cmd_match) {
 	byte type = CREATE_DATABASE, func = 0;
@@ -185,18 +164,6 @@ sql_node DB_interpreter::create_database(smatch cmd_match) {
 	return sql_node(type, func, fa_len, fa);
 }
 
-/**
-* \fn	sql_node DB_interpreter::create_index(smatch cmd_match)
-*
-* \brief	Creates an index.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	cmd_match	A match specifying the command.
-*
-* \return	The new index.
-*/
 
 sql_node DB_interpreter::create_index(smatch cmd_match) {
 	size_t fa_len = 1, sa_len = 1, ta_len = 0;
@@ -232,69 +199,58 @@ sql_node DB_interpreter::create_index(smatch cmd_match) {
 	return sql_node(type, func, fa_len, fa, sa_len, sa, ta_len, ta);
 }
 
-/**
-* \fn	sql_node DB_interpreter::create_table(smatch cmd_match)
-*
-* \brief	Creates a table.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	cmd_match	A match specifying the command.
-*
-* \return	The new table.
-*/
 
 sql_node DB_interpreter::create_table(smatch cmd_match) {
 	byte type = CREATE_TABLE, func = 0;
+	size_t fa_len = 1, sa_len = 0;
 	//	cout << cmd_match[1] << "*" << cmd_match[2] << "*" << cmd_match[3] << "*" << cmd_match[4] << "*" << cmd_match[5] << endl;
 	string table_name = string(cmd_match[2]), attribute_str = string(cmd_match[3]);
-	vector<string> attr_vector;
-	vector<string>::iterator iter;
-	split(attribute_str, ",", attr_vector);
 	static char fa_chr[MAXLENGTH];
 	strcpy(fa_chr, table_name.data());
 	static char *fa[] = { fa_chr };
-	size_t fa_len = 1, sa_len = 0;
+
 	static char *sa[MAXNUM];
 	static char sa_chr[MAXNUM][MAXLENGTH];
-	string attr[2];
-	regex attribute_split("\\s*(\\w+)\\s+(\\w[^,]+)\\s*");
+	vector<string> attr_vector;
+	vector<string>::iterator iter;
+	/* Cannot end with a ',' */
+	if (regex_match(attribute_str, regex(".*,\\s*"))) {
+		cout << "Syntax error in '" << attribute_str << "'" << endl;
+		throw IllegalCommand(UndefinedCMD);
+	}
+	split(attribute_str, ",", attr_vector);
+	for (iter = attr_vector.begin(); iter < attr_vector.end(); iter++) {
+		if (attr_func(*iter, sa, sa_len) == false)
+			throw IllegalCommand(UndefinedCMD);
+	}
+
+	/*regex attribute_split("\\s*(\\w+)\\s+(\\w[^,]+)\\s*");
 	smatch attribute_list;
 
-	//regex sp("(\\w+)\\s+(\\S+)\\s*(,|$)");
-	//sregex_iterator pos(attribute_str.cbegin(), attribute_str.cend(), sp);
-	//sregex_iterator end;
-	//for (; pos != end; ++pos) {
-	//	cout << pos->str(1) << endl;
-	//	cout << pos->str(2) << endl;
-	//}
-	//
-
 	for (iter = attr_vector.begin(); iter < attr_vector.end(); iter++) {
-		if (regex_match(*iter, attribute_list, attribute_split)) {
-			attr[0] = string(attribute_list[1]);
-			attr[1] = string(attribute_list[2]);
-			if (attr[0].size() >= MAXLENGTH || attr[1].size() >= MAXLENGTH)
-				throw IllegalCommand(TooLongArgs);
-			if ((sa_len + 2) >= MAXNUM)
-				throw IllegalCommand(TooManyArgs);
-			strcpy(sa_chr[sa_len], attr[0].data());
-			sa[sa_len] = sa_chr[sa_len];
-			sa_len++;
-			strcpy(sa_chr[sa_len], attr[1].data());
-			sa[sa_len] = sa_chr[sa_len];
-			sa_len++;
-		}
-		else
-			throw IllegalCommand(IllegalAttr);
+	if (regex_match(*iter, attribute_list, attribute_split)) {
+	attr[0] = string(attribute_list[1]);
+	attr[1] = string(attribute_list[2]);
+	if (attr[0].size() >= MAXLENGTH || attr[1].size() >= MAXLENGTH)
+	throw IllegalCommand(TooLongArgs);
+	if ((sa_len + 2) >= MAXNUM)
+	throw IllegalCommand(TooManyArgs);
+	strcpy(sa_chr[sa_len], attr[0].data());
+	sa[sa_len] = sa_chr[sa_len];
+	sa_len++;
+	strcpy(sa_chr[sa_len], attr[1].data());
+	sa[sa_len] = sa_chr[sa_len];
+	sa_len++;
 	}
+	else
+	throw IllegalCommand(IllegalAttr);
+	}*/
 	/*last*/
 	return sql_node(type, func, fa_len, fa, sa_len, sa);
 }
 
 /* SELECT */
-void DB_interpreter::select_clause(string SQL) {
+sql_node DB_interpreter::select_clause(string SQL) {
 	/**
 	* 'select' grammar
 	* select (info) from (info) (where (info))?
@@ -305,71 +261,53 @@ void DB_interpreter::select_clause(string SQL) {
 	/***************************************************************************************************/
 	const regex select_split1("^\\s*select\\s+(\\*)\\s+from\\s+(\\S.*\\S)(?:\\s+where\\s+(\\S.*\\S))\\s*;\\s*"); // with 'where'
 	const regex select_split2("^\\s*select\\s+(\\*)\\s+from\\s+(\\S.*\\S)\\s*;\\s*");	// without 'where'
-	vector<string> vec1, vec2;
-	vector<string>::iterator iter;
-	byte type, func;
+	byte type = 0, func = 0, temp = 0;
 	size_t fa_len = 1, sa_len = 1, ta_len = 0;
 	// split SQL statement
-	if (regex_match(SQL, select_match, select_split1)) {
-		func = 0;
+	if (regex_match(SQL, select_match, select_split1))
 		type = SELECT_WHERE;
-	}
-	else if (regex_match(SQL, select_match, select_split2)) {
-		ta_len = 0;
-		func = 0;
+	else if (regex_match(SQL, select_match, select_split2))
 		type = SELECT_ORDINARY;
-	}
 	else
 		throw IllegalCommand(UndefinedCMD);
 	static string table_name = string(select_match[2]);
-	static char *fa[1], *sa[1], *ta[3]; /* At 2 condition statements */
-	static char fa_chr[MAXLENGTH], sa_chr[MAXLENGTH], ta_chr[3][MAXLENGTH];
+	static char *fa[1], *sa[1], *ta[7]; /* At 2 condition statements */
+	static char fa_chr[MAXLENGTH], sa_chr[MAXLENGTH], ta_chr[7][MAXLENGTH];
 	string attr_list = string(select_match[1]), cond_list;
 	strcpy(fa_chr, string(select_match[1]).data());
 	fa[0] = fa_chr;
 	strcpy(sa_chr, table_name.data());
 	sa[0] = sa_chr;
 
-	//cout << select_match[1] << endl;
-	//split(string(select_match[1]), ",", vec1);
-	//for (iter = vec1.begin(); iter < vec1.end(); iter++) {
-	//	attr_list = *iter;
-	//	strcpy(fa_chr[fa_len], attr_list.data());
-	//	fa[fa_len] = fa_chr[fa_len];
-	//	fa_len++;
-	//}
-
 	if (type == SELECT_WHERE) {
-		cout << select_match[3] << endl;
-		split(string(select_match[3]), " ", vec2);
-		for (iter = vec2.begin(); iter < vec2.end(); iter++) {
-			cond_list = *iter;
-			if (ta_len == 1) {
-				func |= OperMap[cond_list];
+		smatch cond_split;
+		string cond_str(select_match[3]);
+		if (regex_match(cond_str, cond_split, regex("\\s*(\\S.*\\S)\\s+(and|or)\\s+(\\S.*\\S)\\s*"))) {
+			int i = 1;
+			while (i <= 3) {
+				if (cond_func(string(cond_split[i]), ta, ta_len, temp)) {
+					func |= (i == 1 ? temp : temp << 4);
+					i = i + 2;
+				}
+				else
+					throw IllegalCommand(UndefinedCMD);
 			}
-			if (ta_len == 3) {
-				string cond = toLower(cond_list);
-				if (cond == "and")
-					func |= 8;
-				else if (cond == "or");
-				else throw IllegalCommand(UndefinedCMD);
-
-			}
-			if (ta_len == 5) {
-				func |= (OperMap[cond_list] << 4);
-
-			}
-			strcpy(ta_chr[ta_len], cond_list.data());
-			ta[ta_len] = ta_chr[ta_len];
-			ta_len++;
+			if (string(cond_split[2]) == "and")
+				func |= 0x80;
 		}
+		else if (cond_func(cond_str, ta, ta_len, temp)) {
+			func |= temp;
+		}
+		else
+			throw IllegalCommand(UndefinedCMD);
 	}
 	sql_node node(type, func, fa_len, fa, sa_len, sa, ta_len, ta);
 	node.show();
+	return node;
 }
 //	const regex select_split("^\\s*select\\s(\\w)+\\sfrom\\s(select\\s(\\w+)\\sfrom(\\w+)\\s(where\\s(.*))?)|(\\^((select)|(where).*))\\swhere\\s(.*)))");
 
-void DB_interpreter::insert_clause(string SQL) {
+sql_node DB_interpreter::insert_clause(string SQL) {
 	byte type = INSERT, func = 0;
 	size_t fa_len = 1, sa_len = 0;
 	static char *fa[1], *sa[MAXNUM];
@@ -394,24 +332,101 @@ void DB_interpreter::insert_clause(string SQL) {
 		throw IllegalCommand(UndefinedCMD);
 	sql_node node(type, func, fa_len, fa, sa_len, sa);
 	node.show();
+	return node;
 }
 
-void DB_interpreter::drop_clause(string SQL) {
-
+sql_node DB_interpreter::drop_clause(string SQL) {
+	const regex drop_split("\\s*drop\\s+(\\w+)\\s+(\\w+)\\s*;\\s*");
+	smatch drop_match;
+	size_t fa_len = 1, sa_len = 1;
+	static char *fa[1], *sa[1];
+	static char fa_chr[MAXLENGTH], sa_chr[MAXLENGTH];
+	byte type, func = 0;
+	if (regex_match(SQL, drop_match, drop_split)) {
+		switch (str_map[string(drop_match[1])]) {
+		case TABLE: type = DROP_TABLE; break;
+		case INDEX: type = DROP_INDEX; break;
+		case DATABASE: type = DROP_DATABASE; break;
+		}
+		strcpy(fa_chr, string(drop_match[1]).data());
+		strcpy(sa_chr, string(drop_match[2]).data());
+		fa[0] = fa_chr;
+		sa[0] = sa_chr;
+	}
+	else
+		throw IllegalCommand(UndefinedCMD);
+	sql_node node(type, func, fa_len, fa, sa_len, sa);
+	node.show();
+	return node;
 }
-/**
-* \fn	string DB_interpreter::toLower(string statement)
-*
-* \brief	Converts a statement to a lower.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	statement	The statement.
-*
-* \return	statement as a string.
-*/
 
+sql_node DB_interpreter::use_clause(string SQL) {
+	const regex use_split("\\s*drop\\s+database\\s+(\\w+)\\s*;\\s*");
+	smatch use_match;
+	size_t fa_len = 1;
+	static char *fa[1];
+	static char fa_chr[MAXLENGTH];
+	byte type = USE_SQL, func = 0;
+	if (regex_match(SQL, use_match, use_split)) {
+		strcpy(fa_chr, string(use_match[1]).data());
+		fa[0] = fa_chr;
+	}
+	else
+		throw IllegalCommand(UndefinedCMD);
+	sql_node node(type, func, fa_len, fa);
+	node.show();
+	return node;
+}
+
+sql_node DB_interpreter::delete_clause(string SQL) {
+	smatch delete_match;
+	//	const regex delete_split1("^\\s*delete\\s+from\\s+(\\w+)\\s*;\\s*");
+	//	const regex delete_split2("^\\s*delete\\s+from\\s+(\\w+)\\s+where\\s+(\\S.*\\S))\\s*;\\s*");
+	const regex delete_split1("^\\s*delete\\s+from\\s+(\\w+)(?:\\s+where\\s+(\\S.*\\S))\\s*;\\s*"); // with 'where'
+	const regex delete_split2("^\\s*delete\\s+from\\s+(\\w+)\\s*;\\s*");	// without 'where'
+
+	byte type = 0, func = 0, temp = 0;
+	size_t fa_len = 1, sa_len = 0;
+	// split SQL statement
+	if (regex_match(SQL, delete_match, delete_split1))
+		type = DELETE_WHERE;
+	else if (regex_match(SQL, delete_match, delete_split2))
+		type = DELETE_ORDINARY;
+	else
+		throw IllegalCommand(UndefinedCMD);
+
+	static char *fa[1], *sa[7]; /* At 2 condition statements */
+	static char fa_chr[MAXLENGTH], sa_chr[7][MAXLENGTH];
+	static string table_name = string(delete_match[1]);
+	strcpy(fa_chr, table_name.data());
+	fa[0] = fa_chr;
+
+	if (type == DELETE_WHERE) {
+		smatch cond_split;
+		string cond_str(delete_match[2]);
+		if (regex_match(cond_str, cond_split, regex("\\s*(\\S.*\\S)\\s+(and|or)\\s+(\\S.*\\S)\\s*"))) {
+			int i = 1;
+			while (i <= 3) {
+				if (cond_func(string(cond_split[i]), sa, sa_len, temp)) {
+					func |= (i == 1 ? temp : temp << 4);
+					i = i + 2;
+				}
+				else
+					throw IllegalCommand(UndefinedCMD);
+			}
+			if (string(cond_split[2]) == "and")
+				func |= 0x80;
+		}
+		else if (cond_func(cond_str, sa, sa_len, temp)) {
+			func |= temp;
+		}
+		else
+			throw IllegalCommand(UndefinedCMD);
+	}
+	sql_node node(type, func, fa_len, fa, sa_len, sa);
+	node.show();
+	return node;
+}
 string DB_interpreter::toLower(string statement) {
 	string::iterator iter = statement.begin();
 	string replace;
@@ -454,18 +469,6 @@ void DB_interpreter::DBhelp() {
 	cout << "help" << endl;
 }
 
-/**
-* \fn	sql_node &sql_node::operator=(sql_node &node)
-*
-* \brief	Assignment operator.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param [in,out]	node	The node.
-*
-* \return	A shallow copy of this object.
-*/
 
 sql_node &sql_node::operator=(sql_node &node) {
 	m_type = node.m_type;
@@ -479,14 +482,6 @@ sql_node &sql_node::operator=(sql_node &node) {
 	return *this;
 }
 
-/**
-* \fn	void sql_node::show()
-*
-* \brief	Shows this object.
-*
-* \author	Hac
-* \date	10/16/2015
-*/
 
 void sql_node::show() {
 	cout << "m_type = ";
@@ -523,24 +518,13 @@ void argu_show(size_t length, char **argv) {
 	cout << endl;
 }
 
-/**
-* \fn	void split(const string& src, const string& separator, vector<string>& dest)
-*
-* \brief	Splits.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	src				Source for the.
-* \param	separator   	The separator.
-* \param [in,out]	dest	Destination for the.
-*/
 
 void split(const string& src, const string& separator, vector<string>& dest)
 {
-	string str = src;
-	string substring;
+	string::size_type m_start = src.find_first_not_of(separator, 0);
+	string str = src.substr(m_start, src.size() - m_start);
 	string::size_type start = 0, index;
+	string substring;
 	dest.clear();
 	do
 	{
@@ -558,21 +542,71 @@ void split(const string& src, const string& separator, vector<string>& dest)
 	substring = str.substr(start);
 	dest.push_back(substring);
 }
-
-/**
-* \fn	int main(int argc, char *argv[])
-*
-* \brief	Main entry-point for this application.
-*
-* \author	Hac
-* \date	10/16/2015
-*
-* \param	argc	Number of command-line arguments.
-* \param	argv	Array of command-line argument strings.
-*
-* \return	Exit-code for the process - 0 for success, else an error code.
-*/
-
+bool attr_func(string attr_str, char **sa, size_t &sa_len) {
+	if (sa_len + 1 >= MAXNUM) {
+		cout << "Too Many Attributes" << endl;
+		return false;
+	}
+	smatch attr_match;
+	static char sa_chr[MAXNUM][MAXLENGTH];
+	if (regex_match(attr_str, attr_match, regex("\\s*primary\\s+key\\s*\\(\\s*(\\S+)\\s*\\)\\s*"))) {
+		for (int i = 0; i < sa_len; i++) {
+			if (string(attr_match[1]) == string(sa[i])) {
+				strcpy(sa_chr[sa_len], string(attr_match[1]).data());
+				sa[sa_len] = sa_chr[sa_len++];
+				strcpy(sa_chr[sa_len], (char *)"primary");
+				sa[sa_len] = sa_chr[sa_len++];
+				return true;
+			}
+		}
+		cout << "Attribute '" << attr_match[1] << "' Not Found!" << endl;
+		return false;
+	}
+	vector<string> attr_vec;
+	split(attr_str, " ", attr_vec);
+	if (attr_vec.size() == 2 || (attr_vec.size() == 3 && attr_vec[2] == "unique")) {
+		if (regex_match(attr_vec[1], regex("int|float|char\\(\\d\\d?\\)"))) {
+			strcpy(sa_chr[sa_len], attr_vec[0].c_str());
+			sa[sa_len] = sa_chr[sa_len++];
+			if (attr_vec.size() == 3) {
+				string type_unique = attr_vec[1] + "_u";
+				strcpy(sa_chr[sa_len], type_unique.data());
+			}
+			else
+				strcpy(sa_chr[sa_len], attr_vec[1].c_str());
+			sa[sa_len] = sa_chr[sa_len++];
+			return true;
+		}
+		else {
+			cout << "Undefined Data Type: '" << attr_vec[1] << "'" << endl;
+			return false;
+		}
+	}
+	else {
+		cout << "Error in '" << attr_str << "'." << endl;
+		return false;
+	}
+}
+bool cond_func(string cond_str, char **ta, size_t &ta_len, byte &func_temp) {
+	smatch cond_match;//\\s*(\\S+)\\s*(\\S+)\\s*)
+	const regex cond("([^<=>]+)\\s*(<|<=|=|<>|>|>=)\\s*([^<=>]+)\\s*");
+	static char ta_chr[4][MAXLENGTH];
+	if (regex_match(cond_str, cond_match, cond)) {
+		strcpy(ta_chr[ta_len], string(cond_match[1]).data());
+		ta[ta_len++] = ta_chr[ta_len];
+		strcpy(ta_chr[ta_len], string(cond_match[3]).data());
+		ta[ta_len++] = ta_chr[ta_len];
+		if (OperMap.find(string(cond_match[2])) != OperMap.end()) {
+			func_temp = OperMap[string(cond_match[2])] & 0xF;
+			bin_show(func_temp);
+			return true;
+		}
+		else
+			return false;
+	}
+	else
+		return false;
+}
 int main(int argc, char *argv[])
 {
 	string statement;
@@ -588,17 +622,5 @@ int main(int argc, char *argv[])
 		catch (IllegalCommand e) {
 			e.DBerror();
 		}
-
 	}
-	/*string statement;
-	while (true) {
-	statement = read_input();
-	try {
-	Interpreter(statement);
-	}
-	catch () {
-
-	}
-	}
-	return 0;*/
 }

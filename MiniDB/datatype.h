@@ -1,10 +1,12 @@
 #ifndef __DATATYPE_H_
 #define __DATATYPE_H_
 #include <string>
-
+#include "Data.h"
 const int ValueLen(4), ChildLen(3), OffsetLen(4), LeafLen(7), IntLen(5), FloatLen(10);
-const int Int(0), Float(1), Char_n(2);
-const int DataFile(0), IndexFile(1);
+//const int Int(0), Float(1), Char_n(2);	//put in IndexManager.cpp
+//enum DataType{Int, Float, Char_n};
+//const int DataFile(0), IndexFile(1);
+//enum FileType{DataFile, IndexFile};
 const int Greater(1), NotLess(2), Less(3), NotGreater(4);
 
 struct blockInfo;
@@ -39,6 +41,15 @@ struct index_info {
 								//0---int,1---float,2----char(n)    
 	long offset;                //the record offset in the table file
 	std::string value;          //the value
+
+	//10.27 add by hedejin
+	index_info(){}
+	index_info(const string& name,const Field& f, char *_value) {
+		index_name = name + "_" + f.name;
+		length = f.length;
+		type = f.type;
+		value = _value;
+	}
 };
 
 

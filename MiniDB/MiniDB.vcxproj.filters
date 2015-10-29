@@ -45,6 +45,15 @@
     <ClInclude Include="DB_Interpreter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DBException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Page.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fileinfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RecordManager.cpp">
@@ -69,6 +78,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DB_Interpreter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Page.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

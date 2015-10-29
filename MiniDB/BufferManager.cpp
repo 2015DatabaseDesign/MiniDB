@@ -19,15 +19,15 @@ static size_t FILE_NUM = 0;
 // Returns:   int
 // Qualifier:
 //************************************
-int main()
-{
-	string tableName("hello");
-	fileInfo *a;
-	useDatabase(string("hac"));
-	a = get_file_info(tableName, 1);
-	getchar();
-	return 0;
-}
+//int main()
+//{
+//	string tableName("hello");
+//	fileInfo *a;
+//	useDatabase(string("hac"));
+//	a = get_file_info(tableName, 1);
+//	getchar();
+//	return 0;
+//}
 
 void mem_init() {
 	FileHandle = (fileInfo *)malloc(sizeof(fileInfo) * MAX_FILE_ACTIVE);
@@ -97,7 +97,7 @@ void replace(fileInfo *m_fileInfo, blockInfo *m_blockInfo) {
 	m_blockInfo->file = m_fileInfo;
 }
 
-blockInfo *get_file_block(string Table_Name, int fileType, int blockNum) {
+blockInfo *get_file_block(string DBName, string Table_Name, int fileType, int blockNum) {
 	fileInfo *filenode = FileHandle, *new_file = NULL;
 	blockInfo *blocknode, *new_block = NULL;
 	FILE *file_read = NULL;
@@ -193,7 +193,7 @@ fileInfo *get_file_info(string fileName, int m_fileType) {
 	return node;
 }
 
-blockInfo *readBlock(string m_fileName, int m_blockNum, int m_fileType) {
+blockInfo *readBlock(string DBName, string m_fileName, int m_blockNum, int m_fileType) {
 	blockInfo *ret_block = NULL;
 	fileInfo *filenode = FileHandle;
 	blockInfo *blocknode;
@@ -210,7 +210,7 @@ blockInfo *readBlock(string m_fileName, int m_blockNum, int m_fileType) {
 		filenode = filenode->next;
 	}
 	/* Block Not in Buffer */
-	ret_block = get_file_block(m_fileName, m_fileType, m_blockNum);
+	ret_block = get_file_block("",m_fileName, m_fileType, m_blockNum);
 	return ret_block;
 }
 

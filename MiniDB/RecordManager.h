@@ -3,64 +3,14 @@
 
 #include <vector>
 #include <string>
-#include "Data.h"
+#include <deque>
 //hey man test github
+#include "Page.h"
+#include "BufferManager.h" 
+
 using namespace std;
 
 enum FileType { DataFile, IndexFile };
-
-class Tuple
-{
-private:
-	vector<Data*> datas;
-
-public:
-	Tuple(char *dataStart, Table*);
-	void writeData(char* dataToWrite) const;
-	Data* getData(int index) const;
-	virtual ~Tuple();
-};
-
-class Page
-{
-	static const int PageSize = 4096;
-private:
-	char *data;
-	Table *tabledesc;
-
-public:
-	//record the number of tuples, 
-	//it would be use frequently so I set it to be a public member
-	int TupleNum;
-
-	//the first parameter 'data' comes from blockinfo->cBlock
-	//the second parameter 'td' comes from Catalog manager
-	Page(char *data, Table *td)
-	{
-		this->data = data;
-		this->tabledesc = td;
-	}
-
-	//check if specific tuple is valid
-	bool isTupleValid(int index);
-
-	//check if page is insertable, 
-	//if it is, return the index of the invalid tuple
-	//else return -1
-	int InsertableIndex();
-
-	//insert Tuple
-	//index is the position to insert
-	void WriteTuple(const Tuple&, int index);
-
-	//read a tuple specified by index
-	Tuple& ReadTuple(int index);
-
-	//set certain position of header to be set or reset
-	void SetHeader(int index, bool isSet);
-};
-
-enum Op { EQUALS, GREATER_THAN, GREATE_THAN_OR_EQUAL, LESS_THAN,  LESS_THAN_OR_EQUAL, NOT_EQUAL };
 
 class Condition
 {
@@ -70,6 +20,12 @@ private:
 	int IndexofData;
 
 public:
+	bool operator<(const Condition& c) {
+		if (op == EQUALS)
+			return true;
+		if (c.getOp() == EQUALS)
+			return false;
+	}
 	Condition(Op _op, Data* _operand, int _IndexofData)
 		:op(_op), operand(_operand), IndexofData(_IndexofData) {}
 
@@ -77,37 +33,101 @@ public:
 	bool match(const Tuple& t) const
 	{
 		Data* data = t.getData(IndexofData);
-		switch (data->getType)
-		{
-		case DataType::INT: {
-			int Integer;
-			memcpy(&Integer, data->getValue(), sizeof(int));
-			data = new Int(Integer);
-			break;
-		}
-		case DataType::FLOAT: {
-			float FloatNumber;
-			memcpy(&FloatNumber, data->getValue(), sizeof(float));
-			data = new Float(FloatNumber);
-			break;
-		}
-		case DataType::CHAR: {
-			string str;
-			memcpy(&str, data->getValue(), sizeof(string));
-			data = new Char(str);
-			break;
-		}
-		}
+		return data->compare(op, data);
 	}
 
 	Op getOp() const { return op; }
 
 	DataType getDataType() const { return DataType(operand->getType()); }
+
+	int getIndexOfData() const { return IndexofData; }
 };
+
+enum LinkOp{AND, OR};
+
+inline bool MatchMultiCond(vector<Condition> conds, const Tuple&t, LinkOp lop)
+{
+	if (lop == LinkOp::AND)
+	{
+		bool allMatch = true;
+		for (Condition c : conds)
+		{
+			if (!c.match(t))
+			{
+				allMatch = false;
+				break;
+			}
+		}
+		return allMatch;
+	}
+	else //lop == LinkOp :: OR
+	{
+		bool someMatch = false;
+		for (Condition c : conds)
+		{
+			if (c.match(t))
+			{
+				someMatch = true;
+				break;
+			}
+		}
+		return someMatch;
+	}
+}
+
+class Operation {
+protected:
+	string DBName;
+	string TableName;
+	const Table *tableDesc;
+	int CurrentIndex;
+	Tuple nextTuple;
+public:
+	Operation() {}
+	Operation(string _DBName, string _TableName, const Table* _tabledesc)
+		:DBName(_DBName), TableName(_TableName), tableDesc(_tabledesc), CurrentIndex(0) {}
+	virtual const Tuple &next() const;
+	virtual bool hasNext();
+	virtual ~Operation() = 0 {};
+};
+
+class Selector :public Operation {
+public:
+	Selector() {}
+	Selector(string _DBName, string _TableName, const Table* _tabledesc,  const vector<Condition>& _conds, const vector<int>& _LineNums, LinkOp _lop)
+		:Operation(_DBName, _TableName, _tabledesc), conds(_conds), LineNums(_LineNums), lop(_lop) {}
+
+	Selector(string _DBName, string _TableName, const Table* _tabledesc)
+		:Operation(_DBName, _TableName, _tabledesc),lop(LinkOp::AND) {}
+
+	virtual const Tuple &next() const;
+	virtual bool hasNext() ;
+	virtual ~Selector() {};
+private:
+	vector<Condition> conds;
+	vector<int> LineNums;
+	LinkOp lop;
+};
+
+class Deleter :public Operation {
+public:
+	Deleter() {}
+	Deleter(string _DBName, string _TableName, const Table* _tabledesc)
+		:Operation(_DBName, _TableName, _tabledesc), lop(LinkOp::AND){}
+	Deleter(string _DBName, string _TableName, const Table* _tabledesc, const vector<Condition> &_conds, const vector<int> &_LineNums, LinkOp _lop)
+		:Operation(_DBName, _TableName, _tabledesc), conds(_conds), LineNums(_LineNums), lop(_lop) {}
+	virtual const Tuple &next() const;
+	virtual bool hasNext();
+	virtual ~Deleter() {};
+private:
+	vector<Condition> conds;
+	vector<int> LineNums;
+	LinkOp lop;
+};
+ 
 
 class RecordManager
 {
-
 public:
 
 	//DBName -- name of database
@@ -119,12 +139,32 @@ public:
 	//DBName -- name of database
 	//TableName -- name of table
 	//tableDesc -- a point to Table object which contains imformations for reading datas
-	//predicate -- a predicate used to filter tuples
-	//return a vector of tuple which matches
+	//condition -- a condition used to filter tuples
+
+	//select with no conditions
+	void Select(const string& DBName, const string& TableName, Table* tableDesc);
+
+	//select with one condition
 	void Select(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
-	void SelectWithIndex(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition, struct index_info& inform);
-	void Delete(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
-	void DeleteWithIndex(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition, struct index_info& inform);
+
+	//select with mutiple conditions
+	void Select(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions, LinkOp lop);
+	
+	//check if there are mutiple tuples which should be unique
+	//return false if there is a tuple with same value for same attribute as the target tuple
+	//unique attribute and their values are stored in conditions
+	bool CheckUnique(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions);
+	
+	//select with specific line number(given by IndexManager)
+	void Select(const string& DBName, const string& TableName, Table* tableDesc, int LineNum); //new one
+	
+	//select with specific line numbers(given by IndexManager)
+	void Select(const string& DBName, const string& TableName, Table* tableDesc, deque<int> Linenums); //new one
+
+	void Delete(const string& DBName, const string& TableName, Table* tableDesc);
+	Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
+	Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, int LineNum);
+	vector<Tuple> Delete(const string& DBName, const string& TableName, Table* tableDesc, vector<int> LineNums);
 };
 
 #endif

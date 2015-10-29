@@ -3,6 +3,9 @@
 #include "mystr.h"
 #include "IndexManager.h"
 
+const int Int(0), Float(1), Char_n(2);
+const int DataFile(0), IndexFile(1);
+
 using namespace std;
 
 IndexManager::IndexManager() :StrLen(10), N(3), LeafLeast(ceil((N - 1) / 2.0)), InnodeLeast(ceil(N / 2.0) - 1) {};

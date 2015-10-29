@@ -4,12 +4,12 @@
 #include<string>
 #include<deque>
 #include "datatype.h"
-//#include"buffer.h"
+#include "BufferManager.h"
 
-blockInfo *get_file_block(const std::string& database, const std::string& table_name, int fileType, int blockNum);
-void writeRootBlock(const std::string& database, const std::string& table_name, blockInfo *block);
-void deleteBlock(const std::string& database, const std::string& table_name, blockInfo *block);
-blockInfo *get_new_block(const std::string& database, const std::string& table_name);
+//blockInfo *get_file_block(const std::string& database, const std::string& table_name, int fileType, int blockNum);
+//void writeRootBlock(const std::string& database, const std::string& table_name, blockInfo *block);
+//void deleteBlock(const std::string& database, const std::string& table_name, blockInfo *block);
+//blockInfo *get_new_block(const std::string& database, const std::string& table_name);
 
 class IndexManager {
 private:
@@ -34,9 +34,9 @@ public:
 	IndexManager();
 	//返回查找的block的block号。
 	int search_one(const std::string& database, const std::string& table_name, struct index_info& inform);
-//	void search_many(const std::string& database, const std::string& table_name, int& start, int& end, int type, struct index_info& inform);
+	void search_many(const std::string& database, const std::string& table_name, int& start, int& end, int type, struct index_info& inform);
 // !!!根据10/24的讨论，将search_many的signatrue做修改，返回一个行号的集合，方便RecordManager的使用
-	void search_many(const std::string& database, const std::string& table_name, int& start, int& end, int type, struct index_info& inform, deque<int>& LineNums);
+	//void search_many(const std::string& database, const std::string& table_name, int type, struct index_info& inform, deque<int>& LineNums);
 
 	void insert_one(const std::string& database, const std::string& table_name, struct index_info& inform);
 	void delete_one(const std::string& database, const std::string& table_name, struct index_info& inform);

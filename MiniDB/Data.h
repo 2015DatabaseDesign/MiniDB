@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include "DBException.h" //add by hedejin 10/28
 using namespace std;
 
 enum KeyType{NORMAL, UNIQUE, PRIMARY};
@@ -18,6 +19,7 @@ enum DataType{INT, FLOAT, CHAR};
 const int LENGTH_OF_INT = 4;
 const int LENGTH_OF_FLOAT = 4;
 const int LENGTH_OF_CHAR = 1;
+enum Op { EQUALS, GREATER_THAN, GREATE_THAN_OR_EQUAL, LESS_THAN, LESS_THAN_OR_EQUAL, NOT_EQUAL };//add by hedejin 10/28
 
 class Data {
 private:
@@ -28,9 +30,12 @@ public:
 	Data(unsigned _type, unsigned _length);
 	//string getName();
 	virtual ~Data();
-	int getType();
+	int getType() const;
 	unsigned getLength();
-	virtual void* getValue() = 0;
+	//add by hedejin 10/28
+	virtual bool compare(Op op, const Data* data);
+	virtual void* getValue() const = 0;
+
 };
 
 class Int : public Data {
@@ -39,7 +44,8 @@ private:
 public:
 	Int(int _value);
 	~Int();
-	virtual void* getValue();
+	virtual bool compare(Op op, const Data* data);
+	virtual void* getValue() const;
 };
 
 class Float : public Data {
@@ -48,7 +54,8 @@ private:
 public:
 	Float(float _value);
 	~Float();
-	virtual void* getValue();
+	virtual bool compare(Op op, const Data* data);
+	virtual void* getValue() const;
 };
 
 class Char : public Data {
@@ -57,7 +64,8 @@ private:
 public:
 	Char(string _value);
 	~Char();
-	virtual void* getValue();
+	virtual bool compare(Op op, const Data* data);
+	virtual void* getValue() const;
 };
 
 class Field {
@@ -80,6 +88,8 @@ public:
 };
 
 class Table {
+	//add by hedejin
+	friend ostream &operator<<(ostream &os, const Table &t);
 public:
 	string name;
 	int numOfField;
@@ -101,9 +111,36 @@ public:
 	int getIndexOf(string name);
 	bool findField(string _name);
 	Field& getFieldInfo(string _name);
-	Field& getFieldInfoAtIndex(size_t index);
+	const Field& getFieldInfoAtIndex(size_t index) const;
 
 	void show();
+
+	//add by hedejin 10.27
+	vector<int> getUniqueIndexs() {
+		vector<int> UniqueIndexs;
+		for (int i = 0; i < fields.size(); i++)
+		{
+			const Field &f = fields[i];
+			if (f.attribute == KeyType::UNIQUE)
+			{
+				UniqueIndexs.push_back(i);
+			}
+		}
+		return UniqueIndexs;
+	}
+
+	vector<int> getTupleWithIndexs() const{
+		vector<int> TupleWithIndexs;
+		for (int i = 0; i < fields.size(); i++)
+		{
+			const Field &f = fields[i];
+			if (f.hasIndex == true)
+			{
+				TupleWithIndexs.push_back(i);
+			}
+		}
+		return TupleWithIndexs;
+	}
 };
 #endif /* RECORDMANAGER_DATA_H_ */
 
