@@ -143,6 +143,15 @@ public:
 		}
 		return TupleWithIndexs;
 	}
+
+	bool HasPrim()const {
+		for (auto f : fields)
+		{
+			if (f.attribute == PRIMARY)
+				return true;
+		}
+		return false;
+	}
 };
 #endif /* RECORDMANAGER_DATA_H_ */
 

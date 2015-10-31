@@ -270,7 +270,7 @@ sql_node DB_interpreter::select_clause(string SQL) {
 		type = SELECT_ORDINARY;
 	else
 		throw IllegalCommand(UndefinedCMD);
-	static string table_name = string(select_match[2]);
+	string table_name = string(select_match[2]);
 	static char *fa[1], *sa[1], *ta[7]; /* At 2 condition statements */
 	static char fa_chr[MAXLENGTH], sa_chr[MAXLENGTH], ta_chr[7][MAXLENGTH];
 	string attr_list = string(select_match[1]), cond_list;
@@ -308,7 +308,7 @@ sql_node DB_interpreter::select_clause(string SQL) {
 //	const regex select_split("^\\s*select\\s(\\w)+\\sfrom\\s(select\\s(\\w+)\\sfrom(\\w+)\\s(where\\s(.*))?)|(\\^((select)|(where).*))\\swhere\\s(.*)))");
 
 sql_node DB_interpreter::insert_clause(string SQL) {
-	byte type = INSERT, func = 0;
+	byte type = INSERT_SQL, func = 0;
 	size_t fa_len = 1, sa_len = 0;
 	static char *fa[1], *sa[MAXNUM];
 	static char fa_chr[MAXLENGTH], sa_chr[MAXNUM][MAXLENGTH];
@@ -361,7 +361,7 @@ sql_node DB_interpreter::drop_clause(string SQL) {
 }
 
 sql_node DB_interpreter::use_clause(string SQL) {
-	const regex use_split("\\s*drop\\s+database\\s+(\\w+)\\s*;\\s*");
+	const regex use_split("\\s*use\\s+database\\s+(\\w+)\\s*;\\s*");
 	smatch use_match;
 	size_t fa_len = 1;
 	static char *fa[1];
@@ -589,7 +589,7 @@ bool attr_func(string attr_str, char **sa, size_t &sa_len) {
 }
 bool cond_func(string cond_str, char **ta, size_t &ta_len, byte &func_temp) {
 	smatch cond_match;//\\s*(\\S+)\\s*(\\S+)\\s*)
-	const regex cond("([^<=>]+)\\s*(<|<=|=|<>|>|>=)\\s*([^<=>]+)\\s*");
+	const regex cond("([^<=>\\s]+)\\s*(<|<=|=|<>|>|>=)\\s*([^<=>\\s]+)\\s*");
 	static char ta_chr[4][MAXLENGTH];
 	if (regex_match(cond_str, cond_match, cond)) {
 		strcpy(ta_chr[ta_len], string(cond_match[1]).data());

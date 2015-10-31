@@ -11,12 +11,12 @@ bool Selector::hasNext()
 
 	if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
 	{
-		int blocknum = CurrentIndex / TupleNumInPage;
-		int LineNumInPage = CurrentIndex % TupleNumInPage;
-
 		while (true)
 		{
-			blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+			int blocknum = CurrentIndex / TupleNumInPage;
+			int LineNumInPage = CurrentIndex % TupleNumInPage;
+
+			blockInfo *info = readBlock( TableName, blocknum, DataFile);
 			if (info == NULL)
 			{
 				//no next tuple matches conditions
@@ -43,6 +43,7 @@ bool Selector::hasNext()
 					if (MatchMultiCond(conds, t, lop))
 					{
 						nextTuple = t;
+						CurrentIndex++;
 						return true;
 					}
 				}
@@ -58,7 +59,7 @@ bool Selector::hasNext()
 		{
 			int blocknum = LineNum / TupleNumInPage;
 			int LineNumInPage = LineNum % TupleNumInPage;
-			blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+			blockInfo *info = readBlock( TableName, blocknum, DataFile);
 			if (info == NULL)
 			{
 				//!!!error block shoudn't be null
@@ -110,7 +111,7 @@ bool Deleter::hasNext()
 
 		while (true)
 		{
-			blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+			blockInfo *info = readBlock( TableName, blocknum, DataFile);
 			if (info == NULL)
 			{
 				//no next tuple matches conditions
@@ -153,7 +154,7 @@ bool Deleter::hasNext()
 		{
 			int blocknum = LineNum / TupleNumInPage;
 			int LineNumInPage = LineNum % TupleNumInPage;
-			blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+			blockInfo *info = readBlock( TableName, blocknum, DataFile);
 			if (info == NULL)
 			{
 				//!!!error block shoudn't be null
@@ -196,13 +197,22 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 	blockInfo *info;
 	while (true)
 	{
-		info = readBlock(DBName, TableName, blocknum, DataFile);
+		bool newblockflag = false;
+		info = readBlock( TableName, blocknum, DataFile);
 		if (info == NULL)
 		{
-			info = getNewBlock(DBName, TableName, blocknum, DataFile);	//!!!should be provided by buffer manager
+			info = get_new_block(TableName, blocknum, DataFile);	//!!!should be provided by buffer manager
+			newblockflag = true;
 		}
 
 		Page page(info->cBlock, tableDesc);
+		if (newblockflag)
+		{
+			for (int i = 0; i < page.getTupleNum(); i++)
+			{
+				page.SetHeader(i, false);
+			}
+		}
 		
 		int index = page.InsertableIndex();
 		if (index != -1)
@@ -224,7 +234,7 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 //	int blocknum = 0;
 //	while (true)
 //	{
-//		blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+//		blockInfo *info = readBlock( TableName, blocknum, DataFile);
 //		if (info == NULL)
 //			break;
 //
@@ -256,7 +266,7 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 //	int blocknum = 0;
 //	while (true)
 //	{
-//		blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+//		blockInfo *info = readBlock( TableName, blocknum, DataFile);
 //		if (info == NULL)
 //			break;
 //
@@ -296,7 +306,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 	int blocknum = 0;
 	while (true)
 	{
-		blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);
+		blockInfo *info = readBlock( TableName, blocknum, DataFile);
 		if (info == NULL)
 			break;
 
@@ -331,7 +341,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 //	int TupleNumPerPage = Page::getTupleNum(tableDesc);
 //
 //	int blocknum = LineNum / TupleNumPerPage;
-//	blockInfo *block = readBlock(DBName,TableName, blocknum, FileType::DataFile);
+//	blockInfo *block = readBlock(TableName, blocknum, FileType::DataFile);
 //
 //	Page page(block->cBlock, tableDesc);
 //	 
@@ -355,7 +365,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 //	for (int line : LineNums)
 //	{
 //		int blocknum = line / TupleNumPerPage;
-//		blockInfo *block = readBlock(DBName,TableName, blocknum, FileType::DataFile);
+//		blockInfo *block = readBlock(TableName, blocknum, FileType::DataFile);
 //
 //		Page page(block->cBlock, tableDesc);
 //
@@ -380,7 +390,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 //	int blocknum = 0;
 //	while (true)
 //	{
-//		blockInfo *info = readBlock(DBName, TableName, blocknum, DataFile);	//!!!should be done in API
+//		blockInfo *info = readBlock( TableName, blocknum, DataFile);	//!!!should be done in API
 //		if (info == NULL)
 //		{
 //			//error :no such tuple
@@ -413,7 +423,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 //	int TupleNumPerPage = Page::getTupleNum(tableDesc);
 //
 //	int blocknum = LineNum / TupleNumPerPage;
-//	blockInfo *info= readBlock(DBName, TableName, blocknum, FileType::DataFile);
+//	blockInfo *info= readBlock( TableName, blocknum, FileType::DataFile);
 //	if (info == NULL)
 //	{
 //		//error:page is not in this file
@@ -444,7 +454,7 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 //	for (int LineNum : LineNums)
 //	{
 //		int blocknum = LineNum / TupleNumPerPage;
-//		blockInfo *info = readBlock(DBName, TableName, blocknum, FileType::DataFile);
+//		blockInfo *info = readBlock( TableName, blocknum, FileType::DataFile);
 //		if (info == NULL)
 //		{
 //			//error:page is not in this file

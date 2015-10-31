@@ -8,22 +8,55 @@ const size_t MAX_BLOCK = 40;
 #include "string"
 using namespace std;
 
-void useDatabase(string DB_Name);
+//void useDatabase(string DB_Name);
+//blockInfo *findBlock();
+//string get_file_path(string table_name, int file_type);
+//void replace(fileInfo *m_fileInfo, blockInfo *m_blockInfo);
+//blockInfo *get_file_block(string DBName, string Table_Name, int fileType, int blockNum);
+//void closeDatabase(string DB_Name, bool m_flag);
+//void closeFile(size_t num);
+//void writeBlock(size_t m_file_num, blockInfo *block);
+//fileInfo *get_file_info(string fileName, int m_fileType);
+//blockInfo *readBlock(string DBName, string m_fileName, int m_blockNum, int m_fileType);
+//void quitProg(string DB_Name);
+//inline void writeRootBlock(const string &database, const string &table_name, blockInfo *block) {};
+//inline void deleteBlock(const string &database, const string &table_name, blockInfo *block) {};
+//void Get_Table_Info(string DB_Name, string Table_Name, int &record_count, int &record_len, int &free);
+//void Write_Table_Info(string DB_Name, string Table_Name, int &record_count, int &record_len, int &free);
+//void Write_Index_Info(string DB_Name, string Index_Name, int &record_count, int &record_len, int &free);
+////add by hedejin
+//inline blockInfo *getNewBlock(string DBName, string m_fileName, int m_blockNum, int m_fileType) { return NULL; }
+//inline blockInfo *get_new_block(string DBName, string m_fileName) { return NULL; }
+
+static string DATABASE_NAME;
+
+string getDatabaseName();
+void mem_init();
+bool useDatabase(string DB_Name);
 blockInfo *findBlock();
 string get_file_path(string table_name, int file_type);
+string get_directory_path(string databaseName);
 void replace(fileInfo *m_fileInfo, blockInfo *m_blockInfo);
-blockInfo *get_file_block(string DBName, string Table_Name, int fileType, int blockNum);
+blockInfo *get_file_block(string Table_Name, int fileType, int blockNum);
 void closeDatabase(string DB_Name, bool m_flag);
 void closeFile(size_t num);
 void writeBlock(size_t m_file_num, blockInfo *block);
 fileInfo *get_file_info(string fileName, int m_fileType);
-blockInfo *readBlock(string DBName, string m_fileName, int m_blockNum, int m_fileType);
+blockInfo *readBlock(string m_fileName, int m_blockNum, int m_fileType);
 void quitProg(string DB_Name);
-inline void writeRootBlock(const string &database, const string &table_name, blockInfo *block) {};
-inline void deleteBlock(const string &database, const string &table_name, blockInfo *block) {};
+//inline void writeRootBlock(const string &database, const string &table_name, blockInfo *block) {}
+//inline void deleteBlock(const string &database, const string &table_name, blockInfo *block) {}
 void Get_Table_Info(string DB_Name, string Table_Name, int &record_count, int &record_len, int &free);
 void Write_Table_Info(string DB_Name, string Table_Name, int &record_count, int &record_len, int &free);
 void Write_Index_Info(string DB_Name, string Index_Name, int &record_count, int &record_len, int &free);
-//add by hedejin
-inline blockInfo *getNewBlock(string DBName, string m_fileName, int m_blockNum, int m_fileType) { return NULL; }
-inline blockInfo *get_new_block(string DBName, string m_fileName) { return NULL; }
+
+blockInfo *get_new_block(const string& file_name, int fileType, int blockNum);
+size_t create_file(string fileName, int fileType);
+size_t createDatabase(string databaseName);
+size_t delete_file(string fileName, int fileType);
+size_t deleteDatabase(string databaseName);
+
+
+
+void show(blockInfo *);
+void show(fileInfo *);

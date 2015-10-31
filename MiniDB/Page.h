@@ -57,10 +57,10 @@ public:
 		this->data = data;
 		this->tabledesc = td;
 		TupleNum = calcTupleNum(td);
-		for (int i = 0; i < TupleNum; i++)
-		{
-			this->SetHeader(i, 0);
-		}
+		//for (int i = 0; i < TupleNum; i++)
+		//{
+		//	this->SetHeader(i, 0);
+		//}
 	}
 
 	//check if specific tuple is valid

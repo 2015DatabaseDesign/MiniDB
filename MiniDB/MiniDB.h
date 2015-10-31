@@ -12,7 +12,7 @@ private:
 	IndexManager im;
 	CatalogManager cm;			
 	RecordManager rm;
-	string DBName;
+	//string DBName;
 	DB_interpreter ip;
 
 	void Print(Selector& selector, const Table* tableDesc);
@@ -21,8 +21,10 @@ private:
 	Op getOpFromFunc(int input);
 	vector<int> getLineNumsAndLeftConds(const Table* table, vector<Condition> &conds, LinkOp op);
 public:
-	MiniDB() {}
-	void getOperation(const sql_node& node);
+	MiniDB() {
+		mem_init();
+	}
+	bool getOperation(const sql_node& node);
 	void readinput();
 	void CreateTable(const sql_node &node);
 	void CreateIndex(const sql_node &node);

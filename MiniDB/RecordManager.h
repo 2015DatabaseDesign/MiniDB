@@ -84,9 +84,9 @@ protected:
 	string DBName;
 	string TableName;
 	const Table *tableDesc;
-	int CurrentIndex;
 	Tuple nextTuple;
 public:
+	int CurrentIndex;
 	Operation() {}
 	Operation(string _DBName, string _TableName, const Table* _tabledesc)
 		:DBName(_DBName), TableName(_TableName), tableDesc(_tabledesc), CurrentIndex(0) {}

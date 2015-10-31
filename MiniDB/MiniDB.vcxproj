@@ -34,7 +34,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
@@ -230,6 +230,7 @@
     <ClCompile Include="DB_Interpreter.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MiniDB.cpp" />
+    <ClCompile Include="mybuffer.cpp" />
     <ClCompile Include="mystr.cpp" />
     <ClCompile Include="Page.cpp" />
     <ClCompile Include="RecordManager.cpp" />

@@ -15,7 +15,7 @@ const string IToStr(int n, int length) {
 	char *s = (char *)malloc(sizeof(char) * (length + 1));
 	s[length] = '\0';
 	for (int i = length - 1; i >= 0; i--) {
-		s[i] = n % 10;
+		s[i] = n % 10 + '0';
 		n /= 10;
 	}
 	string ss(s);
