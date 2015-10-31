@@ -35,14 +35,35 @@ public:
 	vector<string> getAllTable();
 
 	bool deleteAll(string _name);
-	void setIndex(Table* table, int i, bool hasIndex) {
-		char buffer[16];
+	//void setIndex(Table* table, int i, bool hasIndex) {
+	//	char buffer[16];
+	//	table->fields[i].hasIndex = true;
+	//	fCatalog.seekg(table->locationOfTable + 32 + 16 * i, ios::beg);
+	//	fCatalog.read(buffer, 16);
+	//	buffer[12] = hasIndex ? 1 : 0;
+	//	fCatalog.seekp(-16, ios::cur);
+	//	fCatalog.write(buffer, 16);
+	//}
+	void setIndex(Table* table, string indexname, int i, bool hasIndex) {
+		char buffer[23];
 		table->fields[i].hasIndex = true;
-		fCatalog.seekg(table->locationOfTable + 32 + 16 * i, ios::beg);
-		fCatalog.read(buffer, 16);
+		table->fields[i].indexname = indexname;
+		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
+		fCatalog.read(buffer, 23);
 		buffer[12] = hasIndex ? 1 : 0;
-		fCatalog.seekp(-16, ios::cur);
-		fCatalog.write(buffer, 16);
+		fCatalog.seekp(-23, ios::cur);
+		fCatalog.write(buffer, 23);
+	}
+
+	void dropIndex(Table* table, string indexname, int i, bool hasIndex) {
+		char buffer[23];
+		table->fields[i].hasIndex = false;
+		table->fields[i].indexname = "noindex";
+		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
+		fCatalog.read(buffer, 23);
+		buffer[12] = hasIndex ? 1 : 0;
+		fCatalog.seekp(-23, ios::cur);
+		fCatalog.write(buffer, 23);
 	}
 };
 

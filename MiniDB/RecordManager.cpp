@@ -7,7 +7,7 @@ const Tuple & Selector::next() const
 
 bool Selector::hasNext()
 {
-	int TupleNumInPage = Page::getTupleNum(tableDesc);
+	int TupleNumInPage = Page::calcTupleNum(tableDesc);
 
 	if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
 	{
@@ -24,7 +24,7 @@ bool Selector::hasNext()
 			}
 
 			Page page(info->cBlock, tableDesc);
-			for (int i = LineNumInPage; i < page.TupleNum; i++)
+			for (int i = LineNumInPage; i < page.getTupleNum(); i++)
 			{
 				if (page.isTupleValid(i))
 				{
@@ -40,7 +40,7 @@ bool Selector::hasNext()
 					//}
 
 					//if this tuple match all the conditions
-					if (MatchMultiCond(conds,t,lop))
+					if (MatchMultiCond(conds, t, lop))
 					{
 						nextTuple = t;
 						return true;
@@ -62,10 +62,13 @@ bool Selector::hasNext()
 			if (info == NULL)
 			{
 				//!!!error block shoudn't be null
-				throw new logic_error("Read block using line number given by IndexManager but fail");
+				throw IndexManagerIncompatiblewithRecordManager();
 			}
 
 			Page page(info->cBlock, tableDesc);
+			if (!page.isTupleValid(LineNumInPage))
+				throw IndexManagerIncompatiblewithRecordManager();
+
 			const Tuple& t = page.ReadTuple(LineNumInPage);
 
 			/*bool allMatch = true;
@@ -98,7 +101,7 @@ const Tuple & Deleter::next() const
 
 bool Deleter::hasNext()
 {
-	int TupleNumInPage = Page::getTupleNum(tableDesc);
+	int TupleNumInPage = Page::calcTupleNum(tableDesc);
 
 	if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
 	{
@@ -115,7 +118,7 @@ bool Deleter::hasNext()
 			}
 
 			Page page(info->cBlock, tableDesc);
-			for (int i = LineNumInPage; i < page.TupleNum; i++)
+			for (int i = LineNumInPage; i < page.getTupleNum(); i++)
 			{
 				if (page.isTupleValid(i))
 				{
@@ -154,10 +157,13 @@ bool Deleter::hasNext()
 			if (info == NULL)
 			{
 				//!!!error block shoudn't be null
-				throw new logic_error("Read block using line number given by IndexManager but fail");
+				throw IndexManagerIncompatiblewithRecordManager();
 			}
 
 			Page page(info->cBlock, tableDesc);
+			if (!page.isTupleValid(TupleNumInPage))
+				throw IndexManagerIncompatiblewithRecordManager();
+
 			const Tuple& t = page.ReadTuple(LineNumInPage);
 
 			bool allMatch = true;
@@ -197,6 +203,7 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 		}
 
 		Page page(info->cBlock, tableDesc);
+		
 		int index = page.InsertableIndex();
 		if (index != -1)
 		{
@@ -295,23 +302,23 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 
 		Page page(info->cBlock, tableDesc);
 		bool first = true;
-		for (int i = 0; i < page.TupleNum; i++)
+		for (int i = 0; i < page.getTupleNum(); i++)
 		{
 			if (page.isTupleValid(i))
 			{
 				const Tuple& t = page.ReadTuple(i);
-				//bool isMutiple = false;
 				for (auto condition : conditions)
 				{
 					if (condition.match(t))
 					{
-						//isMutiple = true;    
+						cout << "Cannot insert duplicate key in " << TableName << "." << endl;
+						cout << ". The duplicate key value occurs in :" << endl;
+						cout << t << endl;
 						return false;
 					}
 				}
 			}
 		}
-
 		blocknum++;
 	}
 

@@ -1,34 +1,54 @@
 #pragma once
 #include <iostream>
 #include "Data.h"
+#include <memory>
+#include "PageException.h"
+//class Tuple
+//{
+//	friend ostream &operator<<(ostream &os, const Tuple &t);
+//private:
+//	vector<Data*> datas;
+//
+//public:
+//	Tuple(){}
+//	Tuple(const vector<Data*>& _datas)
+//		: datas(_datas) {}
+//	Tuple(char *dataStart, const Table*);
+//	void writeData(char* dataToWrite) const;
+//	Data* getData(int index) const;
+//	virtual ~Tuple();
+//};
 class Tuple
 {
 	friend ostream &operator<<(ostream &os, const Tuple &t);
+	friend bool operator==(const Tuple& t0, const Tuple &t1);
 private:
-	vector<Data*> datas;
-
 public:
-	Tuple(){}
-	Tuple(const vector<Data*>& _datas)
+	string toString()const;
+	vector<shared_ptr<Data>> datas;
+	Tuple() {}
+	Tuple(const vector<shared_ptr<Data>>& _datas)
 		: datas(_datas) {}
 	Tuple(char *dataStart, const Table*);
-	void writeData(char* dataToWrite) const;
-	Data* getData(int index) const;
+	void writeData(char* dataToWrite, const Table *table) const;
+	shared_ptr<Data> getData(int index) const;
 	virtual ~Tuple();
 };
 
 class Page
 {
 private:
-	static const int PageSize = 4096;
 	char *data;
 	const Table *tabledesc;
+	int TupleNum;
 
 public:
-	static int getTupleNum(const Table *td);
+	Page() {}
+	static const int PageSize = 4096;
+	static int calcTupleNum(const Table *td);
 	//record the number of tuples, 
-	//it would be use frequently so I set it to be a public member
-	int TupleNum;
+	//it would be used frequently 
+	int getTupleNum() const { return TupleNum; }
 
 	//the first parameter 'data' comes from blockinfo->cBlock
 	//the second parameter 'td' comes from Catalog manager
@@ -36,6 +56,11 @@ public:
 	{
 		this->data = data;
 		this->tabledesc = td;
+		TupleNum = calcTupleNum(td);
+		for (int i = 0; i < TupleNum; i++)
+		{
+			this->SetHeader(i, 0);
+		}
 	}
 
 	//check if specific tuple is valid

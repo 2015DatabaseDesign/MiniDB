@@ -7,6 +7,8 @@
 //hey man test github
 #include "Page.h"
 #include "BufferManager.h" 
+#include "RecordManagerException.h"
+#include "DBException.h"
 
 using namespace std;
 
@@ -16,7 +18,7 @@ class Condition
 {
 private:
 	Op op;
-	Data *operand;
+	shared_ptr<Data> operand;
 	int IndexofData;
 
 public:
@@ -26,14 +28,14 @@ public:
 		if (c.getOp() == EQUALS)
 			return false;
 	}
-	Condition(Op _op, Data* _operand, int _IndexofData)
+	Condition(Op _op, shared_ptr<Data> _operand, int _IndexofData)
 		:op(_op), operand(_operand), IndexofData(_IndexofData) {}
 
 	//check if tuple matches the predicate
 	bool match(const Tuple& t) const
 	{
-		Data* data = t.getData(IndexofData);
-		return data->compare(op, data);
+		shared_ptr<Data> data = t.getData(IndexofData);
+		return data->compare(op, operand.get());
 	}
 
 	Op getOp() const { return op; }
@@ -41,6 +43,8 @@ public:
 	DataType getDataType() const { return DataType(operand->getType()); }
 
 	int getIndexOfData() const { return IndexofData; }
+
+	Data* getData() const { return operand.get(); }
 };
 
 enum LinkOp{AND, OR};
@@ -142,29 +146,29 @@ public:
 	//condition -- a condition used to filter tuples
 
 	//select with no conditions
-	void Select(const string& DBName, const string& TableName, Table* tableDesc);
+	//void Select(const string& DBName, const string& TableName, Table* tableDesc);
 
-	//select with one condition
-	void Select(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
+	////select with one condition
+	//void Select(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
 
-	//select with mutiple conditions
-	void Select(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions, LinkOp lop);
+	////select with mutiple conditions
+	//void Select(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions, LinkOp lop);
 	
 	//check if there are mutiple tuples which should be unique
 	//return false if there is a tuple with same value for same attribute as the target tuple
 	//unique attribute and their values are stored in conditions
 	bool CheckUnique(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions);
 	
-	//select with specific line number(given by IndexManager)
-	void Select(const string& DBName, const string& TableName, Table* tableDesc, int LineNum); //new one
-	
-	//select with specific line numbers(given by IndexManager)
-	void Select(const string& DBName, const string& TableName, Table* tableDesc, deque<int> Linenums); //new one
+	////select with specific line number(given by IndexManager)
+	//void Select(const string& DBName, const string& TableName, Table* tableDesc, int LineNum); //new one
+	//
+	////select with specific line numbers(given by IndexManager)
+	//void Select(const string& DBName, const string& TableName, Table* tableDesc, deque<int> Linenums); //new one
 
-	void Delete(const string& DBName, const string& TableName, Table* tableDesc);
-	Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
-	Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, int LineNum);
-	vector<Tuple> Delete(const string& DBName, const string& TableName, Table* tableDesc, vector<int> LineNums);
+	//void Delete(const string& DBName, const string& TableName, Table* tableDesc);
+	//Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
+	//Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, int LineNum);
+	//vector<Tuple> Delete(const string& DBName, const string& TableName, Table* tableDesc, vector<int> LineNums);
 };
 
 #endif

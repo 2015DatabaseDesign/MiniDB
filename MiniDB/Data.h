@@ -11,7 +11,9 @@
 #include <iomanip>
 #include <string>
 #include <vector>
-#include "DBException.h" //add by hedejin 10/28
+#include "DataException.h" //add by hedejin 10/28
+#include "DBException.h"
+
 using namespace std;
 
 enum KeyType{NORMAL, UNIQUE, PRIMARY};
@@ -31,7 +33,7 @@ public:
 	//string getName();
 	virtual ~Data();
 	int getType() const;
-	unsigned getLength();
+	unsigned getLength() const;
 	//add by hedejin 10/28
 	virtual bool compare(Op op, const Data* data);
 	virtual void* getValue() const = 0;
@@ -75,9 +77,10 @@ public:
 	int attribute;
 	int length;
 	bool hasIndex;
+	string indexname;
 
-	Field(string _name, int _type, int _attribute = NORMAL, int _length = 4, bool _hasIndex = false) :
-		name(_name), type(_type), attribute(_attribute), length(_length), hasIndex(_hasIndex) {
+	Field(string _name, int _type, int _attribute = NORMAL, int _length = 4, bool _hasIndex = false, string _indexname = "noindex") :
+		name(_name), type(_type), attribute(_attribute), length(_length), hasIndex(_hasIndex), indexname(_indexname) {
 		if (type == INT)
 			length = LENGTH_OF_INT;
 		if (type == FLOAT)
@@ -88,9 +91,9 @@ public:
 };
 
 class Table {
+public:
 	//add by hedejin
 	friend ostream &operator<<(ostream &os, const Table &t);
-public:
 	string name;
 	int numOfField;
 	vector<Field> fields;
@@ -108,17 +111,16 @@ public:
 	virtual ~Table() {
 	}
 	int getKeyIndex();
-	int getIndexOf(string name);
+	int getIndexOf(string name)const;
 	bool findField(string _name);
 	Field& getFieldInfo(string _name);
 	const Field& getFieldInfoAtIndex(size_t index) const;
-
 	void show();
 
 	//add by hedejin 10.27
 	vector<int> getUniqueIndexs() {
 		vector<int> UniqueIndexs;
-		for (int i = 0; i < fields.size(); i++)
+		for (unsigned i = 0; i < fields.size(); i++)
 		{
 			const Field &f = fields[i];
 			if (f.attribute == KeyType::UNIQUE)
@@ -131,7 +133,7 @@ public:
 
 	vector<int> getTupleWithIndexs() const{
 		vector<int> TupleWithIndexs;
-		for (int i = 0; i < fields.size(); i++)
+		for (unsigned i = 0; i < fields.size(); i++)
 		{
 			const Field &f = fields[i];
 			if (f.hasIndex == true)

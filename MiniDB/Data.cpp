@@ -6,7 +6,6 @@
 */
 
 #include "Data.h"
-
 Data::Data(unsigned _type, unsigned _length) :
 	type(_type), length(_length) {
 
@@ -19,15 +18,15 @@ Data::~Data() {
 int Data::getType() const {
 	return type;
 }
-unsigned Data::getLength() {
+unsigned Data::getLength() const{
 	return length;
 }
 
 //add by hedejin 10/28
-bool Data::compare(Op op, const Data * data)
+bool Data::compare(Op op, const Data* data)
 {
 	//can't be called
-	throw new MethodNotImplementException();
+	throw MethodNotImplementException();
 	return false;
 }
 
@@ -158,22 +157,31 @@ bool Char::compare(Op op, const Data * data)
 		throw DataNotComparableException("Char/String", "Float");
 	}
 	case DataType::CHAR: {
-		char *charValue;
-		memcpy(&charValue, data->getValue(), sizeof(float));
-		string strToCompare = charValue;
+		//char *charValue = new char[data->getLength()];
+		char *src = (char *)data->getValue();
+		int len = data->getLength();
+		//memcpy(charValue, src, data->getLength());
+		//string strToCompare(charValue, data->getLength());
+		string strToCompare(src);
+		string operand(value);
+		while (operand.back() == ' ')
+			operand.pop_back();
+		while (strToCompare.back() == ' ')
+			strToCompare.pop_back();
+
 		switch (op)
 		{
-		case Op::EQUALS: return value == strToCompare;
-		case Op::GREATER_THAN: return value > strToCompare;
-		case Op::GREATE_THAN_OR_EQUAL: return value >= strToCompare;
-		case Op::LESS_THAN:return value < strToCompare;
-		case Op::LESS_THAN_OR_EQUAL:return value <= strToCompare;
-		case Op::NOT_EQUAL:return value != strToCompare;
+		case Op::EQUALS: return operand == strToCompare;
+		case Op::GREATER_THAN: return operand > strToCompare;
+		case Op::GREATE_THAN_OR_EQUAL: return operand >= strToCompare;
+		case Op::LESS_THAN:return operand < strToCompare;
+		case Op::LESS_THAN_OR_EQUAL:return operand <= strToCompare;
+		case Op::NOT_EQUAL:return operand != strToCompare;
 		}
 	}
 	}
 }
-
+//
 ostream &operator<<(ostream &os, const Table &t)
 {
 	for (auto f : t.fields)
@@ -190,7 +198,7 @@ int Table::getKeyIndex() {
 	}
 	return -1;
 }
-int Table::getIndexOf(string name) {
+int Table::getIndexOf(string name)const {
 	for (unsigned i = 0; i < fields.size(); i++) {
 		if (fields[i].name == name)
 			return i;
@@ -227,6 +235,26 @@ const Field& Table::getFieldInfoAtIndex(size_t index) const
 	return f;
 }
 
+//void Table::show() {
+//	cout << hex << "name:           " << name << "\n"
+//		<< "locationOfData: " << locationOfData << "\n"
+//		<< "locationOfTable:" << locationOfTable << "\n"
+//		<< "numOfField:     " << numOfField << "\n"
+//		<< "size:           " << size << "\n"
+//		<< "****************" << endl;
+//	cout.fill(' ');
+//	for (vector<Field>::iterator iter = (fields).begin();
+//	iter != (fields).end(); iter++) {
+//		cout << setiosflags(ios::left)
+//			<< "    Name:" << setw(8) << iter->name << "\n"
+//			<< "\tType:" << ((iter->type == INT) ? "INT  " :
+//				((iter->type == FLOAT) ? "FLOAT" : "CHAR ")) << "\n"
+//			<< "\tAttribute=" << ((iter->attribute == PRIMARY) ? "PRIMARY" :
+//				((iter->attribute == UNIQUE) ? "UNIQUE" : "NORMAL")) << "\n"
+//			<< "\tLength=" << iter->length << "\n";
+//	}
+//	cout << "=================================" << endl;
+//}
 void Table::show() {
 	cout << hex << "name:           " << name << "\n"
 		<< "locationOfData: " << locationOfData << "\n"
@@ -244,7 +272,8 @@ void Table::show() {
 			<< "\tAttribute=" << ((iter->attribute == PRIMARY) ? "PRIMARY" :
 				((iter->attribute == UNIQUE) ? "UNIQUE" : "NORMAL")) << "\n"
 			<< "\tLength=" << iter->length << "\n";
+		if (iter->hasIndex == true) cout << "\thasIndex=" << "yes" << "\n";
+		else cout << "\thasIndex=" << "no" << "\n";
 	}
 	cout << "=================================" << endl;
 }
-

@@ -54,6 +54,15 @@
     <ClInclude Include="fileinfo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DataException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PageException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RecordManagerException.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RecordManager.cpp">

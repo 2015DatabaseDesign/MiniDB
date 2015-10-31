@@ -607,20 +607,20 @@ bool cond_func(string cond_str, char **ta, size_t &ta_len, byte &func_temp) {
 	else
 		return false;
 }
-int main(int argc, char *argv[])
-{
-	string statement;
-	DB_interpreter a;
-	while (true) {
-		try {
-			statement = a.read_input();
-			if (statement != "") {
-				cout << "statement = " << statement << endl;
-				a.Interpreter(statement);
-			}
-		}
-		catch (IllegalCommand e) {
-			e.DBerror();
-		}
-	}
-}
+//int main(int argc, char *argv[])
+//{
+//	string statement;
+//	DB_interpreter a;
+//	while (true) {
+//		try {
+//			statement = a.read_input();
+//			if (statement != "") {
+//				cout << "statement = " << statement << endl;
+//				a.Interpreter(statement);
+//			}
+//		}
+//		catch (IllegalCommand e) {
+//			e.DBerror();
+//		}
+//	}
+//}

@@ -4,6 +4,7 @@
 #include "RecordManager.h"
 #include "CatalogManager.h"
 #include "DB_Interpreter.h"
+#include <set>
 
 class MiniDB
 {
@@ -15,6 +16,10 @@ private:
 	DB_interpreter ip;
 
 	void Print(Selector& selector, const Table* tableDesc);
+	void getCondsAndLinkOp(char ** input, int size, byte func, const Table* table, vector<Condition>& conds, LinkOp & lop);
+	Data * getDataFromStr(string input);
+	Op getOpFromFunc(int input);
+	vector<int> getLineNumsAndLeftConds(const Table* table, vector<Condition> &conds, LinkOp op);
 public:
 	MiniDB() {}
 	void getOperation(const sql_node& node);
@@ -28,6 +33,7 @@ public:
 	void Select(const sql_node &node);
 	void Delete(const sql_node &node);
 	void DeleteAll(string TableName);
+	bool checkTupleFormat(const Table* table, const Tuple & t);
 	virtual ~MiniDB() {}
 };
 
