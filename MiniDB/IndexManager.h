@@ -13,7 +13,7 @@
 blockInfo *get_my_file_block(const std::string& database, const std::string& table_name, int fileType, int blockNum);
 inline void writeRootBlock(const std::string& database, const std::string& table_name, blockInfo *block) {}
 inline void deleteBlock(const std::string& database, const std::string& table_name, blockInfo *block) {
-	memset(block->cBlock, 0, 4000);
+	memset(block->cBlock, 0, 4096);
 	block->dirtyBit = true;
 }
 blockInfo *get_my_new_block(const std::string& database, const std::string& table_name, int blockNum);
