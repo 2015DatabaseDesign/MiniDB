@@ -769,6 +769,7 @@ void IndexManager::insert_leaf(const string& database, const string& table_name,
 	else
 		tmp.insert(tmp.size() - ChildLen, insert);
 	write(leaf, tmp);
+	return;
 }
 
 // Node: the node to be inserted, K1: key, N1: sibling of Node
