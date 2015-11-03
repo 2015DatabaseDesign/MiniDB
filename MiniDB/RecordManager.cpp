@@ -1,5 +1,34 @@
 #include "RecordManager.h"
-
+#include <fstream>
+bool MatchMultiCond(vector<Condition> conds, const Tuple&t, LinkOp lop)
+{
+	if (lop == LinkOp::AND)
+	{
+		bool allMatch = true;
+		for (Condition c : conds)
+		{
+			if (!c.match(t))
+			{
+				allMatch = false;
+				break;
+			}
+		}
+		return allMatch;
+	}
+	else //lop == LinkOp :: OR
+	{
+		bool someMatch = false;
+		for (Condition c : conds)
+		{
+			if (c.match(t))
+			{
+				someMatch = true;
+				break;
+			}
+		}
+		return someMatch;
+	}
+}
 const Tuple & Selector::next() const
 {
 	return nextTuple;
@@ -8,85 +37,82 @@ const Tuple & Selector::next() const
 bool Selector::hasNext()
 {
 	int TupleNumInPage = Page::calcTupleNum(tableDesc);
-
-	if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
+	int nextIndex = CurrentIndex+1;
+	if (LineNums.size() == 0) 
 	{
+		//if (useIndex)
+		//	return false;//Index has no result
+		
+		//no given line numbers, simply iterate tuples
 		while (true)
 		{
-			int blocknum = CurrentIndex / TupleNumInPage;
-			int LineNumInPage = CurrentIndex % TupleNumInPage;
+			int blocknum = nextIndex / TupleNumInPage;
+			int LineNumInPage = nextIndex % TupleNumInPage;
 
-			blockInfo *info = readBlock( TableName, blocknum, DataFile);
-			if (info == NULL)
+			//read a new block
+			if (LineNumInPage == 0)
 			{
-				//no next tuple matches conditions
-				return false;
+				blockInfo *info = readBlock(TableName, blocknum, DataFile);
+				if (info == NULL)
+				{
+					//no next tuple matches conditions
+					return false;
+				}
+				else
+					CurrentBlock = info;
 			}
 
-			Page page(info->cBlock, tableDesc);
+			Page page(CurrentBlock->cBlock, tableDesc);
 			for (int i = LineNumInPage; i < page.getTupleNum(); i++)
 			{
+				//CurrentIndex++;
 				if (page.isTupleValid(i))
 				{
 					const Tuple& t = page.ReadTuple(i);
 					bool allMatch = true;
-					//for (Condition c : conds)
-					//{
-					//	if (!c.match(t))
-					//	{
-					//		allMatch = false;
-					//		break;
-					//	}
-					//}
-
-					//if this tuple match all the conditions
+					
 					if (MatchMultiCond(conds, t, lop))
 					{
 						nextTuple = t;
-						CurrentIndex++;
+						CurrentIndex = nextIndex;
 						return true;
 					}
 				}
-				//record current index
-				CurrentIndex++;
+				nextIndex++;
 			}
 			blocknum++;
 		}
 	}
 	else //use given line numbers
 	{
-		for (int LineNum : LineNums)
+		//for (int i = nextIndex; i < LineNums.size(); i++)
+		for (unsigned nextIndex = givenLineNumIndex + 1; nextIndex < LineNums.size();nextIndex++)
 		{
+			int LineNum = LineNums[nextIndex];//###
+
 			int blocknum = LineNum / TupleNumInPage;
 			int LineNumInPage = LineNum % TupleNumInPage;
-			blockInfo *info = readBlock( TableName, blocknum, DataFile);
-			if (info == NULL)
+			if (CurrentBlock == NULL || blocknum != CurrentBlock->blockNum)	//Read next block
 			{
-				//!!!error block shoudn't be null
-				throw IndexManagerIncompatiblewithRecordManager();
+				blockInfo *info = readBlock(TableName, blocknum, DataFile);
+				if (info == NULL)//!!!error block shoudn't be null
+					throw IndexManagerIncompatiblewithRecordManager();
+				else
+					CurrentBlock = info;
 			}
 
-			Page page(info->cBlock, tableDesc);
+			Page page(CurrentBlock->cBlock, tableDesc);
 			if (!page.isTupleValid(LineNumInPage))
 				throw IndexManagerIncompatiblewithRecordManager();
 
 			const Tuple& t = page.ReadTuple(LineNumInPage);
-
-			/*bool allMatch = true;
-			for (Condition c : conds)
-			{
-				if (!c.match(t))
-				{
-					allMatch = false;
-					break;
-				}
-			}*/
 
 			//if this tuple match all the conditions
 			if (MatchMultiCond(conds, t, lop))
 			{
 				nextTuple = t;
 				CurrentIndex = LineNum;
+				givenLineNumIndex = nextIndex;
 				return true;
 			}
 		}
@@ -103,95 +129,168 @@ const Tuple & Deleter::next() const
 bool Deleter::hasNext()
 {
 	int TupleNumInPage = Page::calcTupleNum(tableDesc);
-
-	if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
+	int nextIndex = CurrentIndex + 1;
+	if (LineNums.size() == 0) 
 	{
-		int blocknum = CurrentIndex / TupleNumInPage;
-		int LineNumInPage = CurrentIndex % TupleNumInPage;
-
+		//if (useIndex)
+		//	return false;//Index has no result
+		
+		//no given line numbers, simply iterate tuples
 		while (true)
 		{
-			blockInfo *info = readBlock( TableName, blocknum, DataFile);
-			if (info == NULL)
+			int blocknum = nextIndex / TupleNumInPage;
+			int LineNumInPage = nextIndex % TupleNumInPage;
+
+			//read a new block
+			if (LineNumInPage == 0)
 			{
-				//no next tuple matches conditions
-				return false;
+				blockInfo *info = readBlock(TableName, blocknum, DataFile);
+				if (info == NULL)
+				{
+					//no next tuple matches conditions
+					return false;
+				}
+				else
+					CurrentBlock = info;
 			}
 
-			Page page(info->cBlock, tableDesc);
+			Page page(CurrentBlock->cBlock, tableDesc);
 			for (int i = LineNumInPage; i < page.getTupleNum(); i++)
 			{
+				//CurrentIndex++;
 				if (page.isTupleValid(i))
 				{
-					const Tuple t = page.ReadTuple(i);
-					//bool allMatch = true;
-					//for (Condition c : conds)
-					//{
-					//	if (!c.match(t))
-					//	{
-					//		allMatch = false;
-					//		break;
-					//	}
-					//}
-					//if this tuple match all the conditions
+					const Tuple& t = page.ReadTuple(i);
+					bool allMatch = true;
+
 					if (MatchMultiCond(conds, t, lop))
 					{
 						nextTuple = t;
-						page.SetHeader(i, false);	//mark it deleted
-						info->dirtyBit = true;		//set it dirty
+						CurrentIndex = nextIndex;
+						page.SetHeader(i, false); //lazy deletion
+						CurrentBlock->dirtyBit = true;//set it dirty
 						return true;
 					}
 				}
-				//record current index
-				CurrentIndex++;
+				nextIndex++;
 			}
 			blocknum++;
 		}
 	}
 	else //use given line numbers
 	{
-		for (int LineNum : LineNums)
+		//for (int i = nextIndex; i < LineNums.size(); i++)
+		for (unsigned nextIndex = givenLineNumIndex + 1; nextIndex < LineNums.size(); nextIndex++)
 		{
+			int LineNum = LineNums[nextIndex];//###
+
 			int blocknum = LineNum / TupleNumInPage;
 			int LineNumInPage = LineNum % TupleNumInPage;
-			blockInfo *info = readBlock( TableName, blocknum, DataFile);
-			if (info == NULL)
+			if (CurrentBlock == NULL || blocknum != CurrentBlock->blockNum)	//Read next block
 			{
-				//!!!error block shoudn't be null
-				throw IndexManagerIncompatiblewithRecordManager();
+				blockInfo *info = readBlock(TableName, blocknum, DataFile);
+				if (info == NULL)//!!!error block shoudn't be null
+					throw IndexManagerIncompatiblewithRecordManager();
+				else
+					CurrentBlock = info;
 			}
 
-			Page page(info->cBlock, tableDesc);
-			if (!page.isTupleValid(TupleNumInPage))
+			Page page(CurrentBlock->cBlock, tableDesc);
+			if (!page.isTupleValid(LineNumInPage))
 				throw IndexManagerIncompatiblewithRecordManager();
 
 			const Tuple& t = page.ReadTuple(LineNumInPage);
 
-			bool allMatch = true;
-			//for (Condition c : conds)
-			//{
-			//	if (!c.match(t))
-			//	{
-			//		allMatch = false;
-			//		break;
-			//	}
-			//}
 			//if this tuple match all the conditions
 			if (MatchMultiCond(conds, t, lop))
 			{
 				nextTuple = t;
-				page.SetHeader(LineNumInPage, false);	//mark it deleted
-				info->dirtyBit = true;		//set it dirty
 				CurrentIndex = LineNum;
+				givenLineNumIndex = nextIndex;
+				page.SetHeader(LineNumInPage, false); //Lazy deletion
+				CurrentBlock->dirtyBit = true;
 				return true;
 			}
 		}
 		//run out of given line numbers
 		return false;
 	}
+	//int TupleNumInPage = Page::calcTupleNum(tableDesc);
+
+	//if (LineNums.size() == 0) //no given line numbers, simply iterate tuples
+	//{
+	//	/*int blocknum = CurrentIndex / TupleNumInPage;
+	//	int LineNumInPage = CurrentIndex % TupleNumInPage;*/
+	//	while (true)
+	//	{
+	//		int blocknum = CurrentIndex / TupleNumInPage;
+	//		int LineNumInPage = CurrentIndex % TupleNumInPage;
+	//		blockInfo *info = readBlock( TableName, blocknum, DataFile);
+	//		if (info == NULL)
+	//		{
+	//			//no next tuple matches conditions
+	//			return false;
+	//		}
+
+	//		Page page(info->cBlock, tableDesc);
+	//		for (int i = LineNumInPage; i < page.getTupleNum(); i++)
+	//		{
+	//			if (page.isTupleValid(i))
+	//			{
+	//				const Tuple t = page.ReadTuple(i);
+
+	//				if (MatchMultiCond(conds, t, lop))
+	//				{
+	//					nextTuple = t;
+	//					page.SetHeader(i, false);	//mark it deleted
+	//					info->dirtyBit = true;		//set it dirty
+	//					CurrentIndex++;
+	//					return true;
+	//				}
+	//			}
+	//			//record current index
+	//			CurrentIndex++;
+	//		}
+	//		blocknum++;
+	//	}
+	//}
+	//else //use given line numbers
+	//{
+	//	for (int i = givenLineNumIndex; i < LineNums.size(); i++)
+	//	{
+	//		int LineNum = LineNums[i];//###
+	//		int blocknum = LineNum / TupleNumInPage;
+	//		int LineNumInPage = LineNum % TupleNumInPage;
+	//		blockInfo *info = readBlock(TableName, blocknum, DataFile);
+	//		if (info == NULL)
+	//		{
+	//			//!!!error block shoudn't be null
+	//			throw IndexManagerIncompatiblewithRecordManager();
+	//		}
+
+	//		Page page(info->cBlock, tableDesc);
+	//		if (!page.isTupleValid(LineNumInPage))
+	//			throw IndexManagerIncompatiblewithRecordManager();
+
+	//		const Tuple& t = page.ReadTuple(LineNumInPage);
+
+	//		//if this tuple match all the conditions
+	//		if (MatchMultiCond(conds, t, lop))
+	//		{
+	//			nextTuple = t;
+	//			CurrentIndex = LineNum;
+	//			givenLineNumIndex++;
+	//			page.SetHeader(LineNumInPage, false);	//mark it deleted
+	//			info->dirtyBit = true;		//set it dirty
+	//			return true;
+	//		}
+	//	}
+	//	//run out of given line numbers
+	//	return false;
+	//}
 }
 
-void RecordManager::Insert(const string& DBName, const string& TableName, Table* tableDesc, const Tuple& t)
+int RecordManager::Insert(const string& DBName, const string& TableName, Table* tableDesc, const Tuple& t)
 {
 	int blocknum = 0;
 	blockInfo *info;
@@ -201,7 +300,7 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 		info = readBlock( TableName, blocknum, DataFile);
 		if (info == NULL)
 		{
-			info = get_new_block(TableName, blocknum, DataFile);	//!!!should be provided by buffer manager
+			info = get_new_block(TableName, DataFile, blocknum);	//!!!should be provided by buffer manager
 			newblockflag = true;
 		}
 
@@ -218,89 +317,19 @@ void RecordManager::Insert(const string& DBName, const string& TableName, Table*
 		if (index != -1)
 		{
 			page.WriteTuple(t, index);
+
 			page.SetHeader(index, true);
+
 			//set dirty
 			info->dirtyBit = true;
 			//insert_one index in IndexManager if needed
-			break;
+			int lineNum = blocknum*page.getTupleNum() + index;
+			return lineNum;
 		}
 		blocknum++;
 	}
 }
-//
-//
-//void RecordManager::Select(const string & DBName, const string & TableName, Table * tableDesc)
-//{
-//	int blocknum = 0;
-//	while (true)
-//	{
-//		blockInfo *info = readBlock( TableName, blocknum, DataFile);
-//		if (info == NULL)
-//			break;
-//
-//		Page page(info->cBlock, tableDesc);
-//		bool first = true;
-//		for (int i = 0; i < page.TupleNum; i++)
-//		{
-//			if (page.isTupleValid(i))
-//			{
-//				const Tuple& t = page.ReadTuple(i);
-//				//first print the attribute names
-//				if (first)
-//				{
-//					cout << *tableDesc << endl;
-//					first = false;
-//				}
-//				//print tuples
-//				cout << t << endl;
-//			}
-//		}
-//
-//		blocknum++;
-//	}
-//}
-//
-////Select with condition
-//void RecordManager::Select(const string & DBName, const string & TableName, Table * tableDesc, const Condition & condition)
-//{
-//	int blocknum = 0;
-//	while (true)
-//	{
-//		blockInfo *info = readBlock( TableName, blocknum, DataFile);
-//		if (info == NULL)
-//			break;
-//
-//		Page page(info->cBlock, tableDesc);
-//		bool first = true;
-//		for (int i = 0; i < page.TupleNum; i++)
-//		{
-//			if (page.isTupleValid(i))
-//			{
-//				const Tuple& t = page.ReadTuple(i);
-//				if (condition.match(t))
-//				{
-//					//first print the attribute names
-//					if (first)
-//					{
-//						cout << *tableDesc << endl;
-//						first = false;
-//					}
-//
-//					//print tuples
-//					cout << t << endl;
-//				}
-//			}
-//		}
-//
-//		blocknum++;
-//	}
-//}
-//
-//void RecordManager::Select(const string & DBName, const string & TableName, Table * tableDesc, const vector<Condition>& conditions, LinkOp lop)
-//{
-//
-//}
-//
+
 bool RecordManager::CheckUnique(const string & DBName, const string & TableName, Table * tableDesc, const vector<Condition>& conditions)
 {
 	int blocknum = 0;
@@ -334,152 +363,6 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 
 	return true;// no tuple has the same value on the same attribute as the given tuple
 }
-//
-////Select with condition and line number given by IndexManager
-//void RecordManager::Select(const string& DBName, const string& TableName, Table* tableDesc, int LineNum)
-//{
-//	int TupleNumPerPage = Page::getTupleNum(tableDesc);
-//
-//	int blocknum = LineNum / TupleNumPerPage;
-//	blockInfo *block = readBlock(TableName, blocknum, FileType::DataFile);
-//
-//	Page page(block->cBlock, tableDesc);
-//	 
-//	int LineNumInPage = LineNum % TupleNumPerPage;
-//	if (page.isTupleValid(LineNumInPage))
-//	{
-//		const Tuple& t = page.ReadTuple(LineNumInPage);
-//
-//		//first print the attribute names
-//		cout << *tableDesc << endl;
-//
-//		//print tuples
-//		cout << t << endl;
-//	}
-//}
-//
-////Select with condition and line numbers given by IndexManager
-//void RecordManager::Select(const string& DBName, const string& TableName, Table* tableDesc, deque<int> LineNums)
-//{
-//	int TupleNumPerPage = Page::getTupleNum(tableDesc);
-//	for (int line : LineNums)
-//	{
-//		int blocknum = line / TupleNumPerPage;
-//		blockInfo *block = readBlock(TableName, blocknum, FileType::DataFile);
-//
-//		Page page(block->cBlock, tableDesc);
-//
-//		int LineNumInPage = line % TupleNumPerPage;
-//		if (page.isTupleValid(LineNumInPage))
-//		{
-//			const Tuple& t = page.ReadTuple(LineNumInPage);
-//
-//			//first print the attribute names
-//			cout << *tableDesc << endl;
-//
-//			//print tuples
-//			cout << t << endl;
-//
-//		}
-//	}
-//}
-//
-////Delete without given line number
-//Tuple RecordManager::Delete(const string & DBName, const string & TableName, Table * tableDesc, const Condition & condition)
-//{
-//	int blocknum = 0;
-//	while (true)
-//	{
-//		blockInfo *info = readBlock( TableName, blocknum, DataFile);	//!!!should be done in API
-//		if (info == NULL)
-//		{
-//			//error :no such tuple
-//		}
-//
-//		Page page(info->cBlock, tableDesc);
-//		for (int i = 0; i < page.TupleNum; i++)
-//		{
-//			if (!page.isTupleValid(i))
-//			{
-//				continue;
-//			}
-//
-//			const Tuple& t = page.ReadTuple(i);
-//			if (condition.match(t))
-//			{
-//				page.SetHeader(i, false);
-//				//set dirty
-//				info->dirtyBit = true;
-//				//return a Tuple contain datas in the deleted tuple 
-//				//in order to apply deletion in index_manger
-//				return t;
-//			}
-//		}
-//	}
-//}
-//
-//Tuple RecordManager::Delete(const string & DBName, const string & TableName, Table * tableDesc, int LineNum)
-//{
-//	int TupleNumPerPage = Page::getTupleNum(tableDesc);
-//
-//	int blocknum = LineNum / TupleNumPerPage;
-//	blockInfo *info= readBlock( TableName, blocknum, FileType::DataFile);
-//	if (info == NULL)
-//	{
-//		//error:page is not in this file
-//	}
-//
-//	Page page(info->cBlock, tableDesc);
-//
-//	int LineNumInPage = LineNum % TupleNumPerPage;
-//	if (page.isTupleValid(LineNumInPage))
-//	{
-//		page.SetHeader(LineNumInPage, false);
-//		//delete indexs in IndexManager
-//		info->dirtyBit = true;
-//		//return a Tuple contain datas in the deleted tuple 
-//		//in order to apply deletion in index_manger
-//		return page.ReadTuple(LineNumInPage);
-//	}
-//	else
-//	{
-//		//tuple is not valid
-//	}
-//}
-//
-//vector<Tuple> RecordManager::Delete(const string & DBName, const string & TableName, Table * tableDesc, vector<int> LineNums)
-//{
-//	vector<Tuple> DeletdTuples;
-//	int TupleNumPerPage = Page::getTupleNum(tableDesc);
-//	for (int LineNum : LineNums)
-//	{
-//		int blocknum = LineNum / TupleNumPerPage;
-//		blockInfo *info = readBlock( TableName, blocknum, FileType::DataFile);
-//		if (info == NULL)
-//		{
-//			//error:page is not in this file
-//		}
-//
-//		Page page(info->cBlock, tableDesc);
-//
-//		int LineNumInPage = LineNum % TupleNumPerPage;
-//		if (page.isTupleValid(LineNumInPage))
-//		{
-//			page.SetHeader(LineNumInPage, false);
-//			//delete indexs in IndexManager
-//			info->dirtyBit = true;
-//			//return a Tuple contain datas in the deleted tuple 
-//			//in order to apply deletion in index_manger
-//			DeletdTuples.push_back(page.ReadTuple(LineNumInPage));
-//		}
-//		else
-//		{
-//			//tuple is not valid
-//		}
-//	}
-//
-//	return DeletdTuples;
-//}
 
 const Tuple & Operation::next() const
 {

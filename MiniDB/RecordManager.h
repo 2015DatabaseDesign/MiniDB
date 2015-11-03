@@ -49,35 +49,6 @@ public:
 
 enum LinkOp{AND, OR};
 
-inline bool MatchMultiCond(vector<Condition> conds, const Tuple&t, LinkOp lop)
-{
-	if (lop == LinkOp::AND)
-	{
-		bool allMatch = true;
-		for (Condition c : conds)
-		{
-			if (!c.match(t))
-			{
-				allMatch = false;
-				break;
-			}
-		}
-		return allMatch;
-	}
-	else //lop == LinkOp :: OR
-	{
-		bool someMatch = false;
-		for (Condition c : conds)
-		{
-			if (c.match(t))
-			{
-				someMatch = true;
-				break;
-			}
-		}
-		return someMatch;
-	}
-}
 
 class Operation {
 protected:
@@ -87,9 +58,11 @@ protected:
 	Tuple nextTuple;
 public:
 	int CurrentIndex;
+	int givenLineNumIndex;
+	blockInfo *CurrentBlock;
 	Operation() {}
 	Operation(string _DBName, string _TableName, const Table* _tabledesc)
-		:DBName(_DBName), TableName(_TableName), tableDesc(_tabledesc), CurrentIndex(0) {}
+		:DBName(_DBName), TableName(_TableName), tableDesc(_tabledesc), CurrentIndex(-1), givenLineNumIndex(-1), CurrentBlock(NULL) {}
 	virtual const Tuple &next() const;
 	virtual bool hasNext();
 	virtual ~Operation() = 0 {};
@@ -99,10 +72,12 @@ class Selector :public Operation {
 public:
 	Selector() {}
 	Selector(string _DBName, string _TableName, const Table* _tabledesc,  const vector<Condition>& _conds, const vector<int>& _LineNums, LinkOp _lop)
-		:Operation(_DBName, _TableName, _tabledesc), conds(_conds), LineNums(_LineNums), lop(_lop) {}
+		:Operation(_DBName, _TableName, _tabledesc ), conds(_conds), LineNums(_LineNums), lop(_lop) {}
 
 	Selector(string _DBName, string _TableName, const Table* _tabledesc)
-		:Operation(_DBName, _TableName, _tabledesc),lop(LinkOp::AND) {}
+		:Operation(_DBName, _TableName, _tabledesc){
+		lop = LinkOp::AND;
+	}
 
 	virtual const Tuple &next() const;
 	virtual bool hasNext() ;
@@ -138,37 +113,12 @@ public:
 	//TableName -- name of table
 	//tableDesc -- a point to Table object which contains imformations for reading datas
 	//t -- tuple to be inserted
-	void Insert(const string& DBName, const string& TableName, Table* tableDesc, const Tuple& t);
-
-	//DBName -- name of database
-	//TableName -- name of table
-	//tableDesc -- a point to Table object which contains imformations for reading datas
-	//condition -- a condition used to filter tuples
-
-	//select with no conditions
-	//void Select(const string& DBName, const string& TableName, Table* tableDesc);
-
-	////select with one condition
-	//void Select(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
-
-	////select with mutiple conditions
-	//void Select(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions, LinkOp lop);
+	int Insert(const string& DBName, const string& TableName, Table* tableDesc, const Tuple& t);
 	
 	//check if there are mutiple tuples which should be unique
 	//return false if there is a tuple with same value for same attribute as the target tuple
 	//unique attribute and their values are stored in conditions
 	bool CheckUnique(const string& DBName, const string& TableName, Table* tableDesc, const vector<Condition>& conditions);
-	
-	////select with specific line number(given by IndexManager)
-	//void Select(const string& DBName, const string& TableName, Table* tableDesc, int LineNum); //new one
-	//
-	////select with specific line numbers(given by IndexManager)
-	//void Select(const string& DBName, const string& TableName, Table* tableDesc, deque<int> Linenums); //new one
-
-	//void Delete(const string& DBName, const string& TableName, Table* tableDesc);
-	//Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, const Condition& condition);
-	//Tuple Delete(const string& DBName, const string& TableName, Table* tableDesc, int LineNum);
-	//vector<Tuple> Delete(const string& DBName, const string& TableName, Table* tableDesc, vector<int> LineNums);
 };
 
 #endif

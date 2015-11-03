@@ -25,6 +25,25 @@ public:
 	const char* what() const throw()
 	{
 		string output = "There is no attribute named " + AttrName + "in table " + TableName;
-		return output.data();
+		char* message = new char[50];
+		strcpy(message, output.data());
+		return message;
+	}
+};
+
+class BreakUniqueness : public exception {
+private:
+	string AttrName;
+public:
+	BreakUniqueness(string AttrName)
+	{
+		this->AttrName = AttrName;
+	}
+	const char* what() const throw()
+	{
+		string output = "Break Uniqueness on attribute " + AttrName;
+		char* message = new char[40];
+		strcpy(message, output.data());
+		return message;
 	}
 };

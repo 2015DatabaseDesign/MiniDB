@@ -2,7 +2,7 @@
 #define __INDEXMANAGER_H_
 
 #include<string>
-#include<deque>
+#include<vector>
 #include "datatype.h"
 #include "BufferManager.h"
 
@@ -16,7 +16,7 @@ inline void deleteBlock(const std::string& database, const std::string& table_na
 	memset(block->cBlock, 0, 4000);
 	block->dirtyBit = true;
 }
-blockInfo *get_my_new_block(const std::string& database, const std::string& table_name);
+blockInfo *get_my_new_block(const std::string& database, const std::string& table_name, int blockNum);
 class IndexManager {
 //private:
 //	int N; // number of pointers in each node
@@ -65,11 +65,11 @@ private:
 	void delete_entry(const std::string& database, const std::string& table_name, struct index_info& inform, int n, const std::string& K, int nod);
 	void insert_leaf(const std::string& database, const std::string& table_name, struct index_info& inform, int Node);
 	void insert_parent(const std::string& database, const std::string& table_name, struct index_info& inform, int Node, const std::string& K, int n);
-	void get_index(const std::string& database, const std::string& table_name, int start, int end, int type, struct index_info& inform, std::deque<int>& container);
+	void get_index(const std::string& database, const std::string& table_name, int start, int end, int type, struct index_info& inform, std::vector<int>& container);
 public:
 	IndexManager();
 	int search_one(const std::string& database, const std::string& table_name, struct index_info& inform);
-	void search_many(const std::string& database, const std::string& table_name, int& start, int& end, int type, struct index_info& inform, std::deque<int>& container);
+	void search_many(const std::string& database, const std::string& table_name, int& start, int& end, int type, struct index_info& inform, std::vector<int>& container);
 	void insert_one(const std::string& database, const std::string& table_name, struct index_info& inform);
 	void delete_one(const std::string& database, const std::string& table_name, struct index_info& inform);
 };

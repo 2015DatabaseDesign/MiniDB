@@ -12,6 +12,7 @@ blockInfo *get_my_file_block(const std::string& database, const std::string& tab
 	blockInfo *node = readBlock(table_name, blockNum, fileType );
 	if (node == NULL) {
 		node = get_new_block(table_name, fileType, blockNum);
+		memset(node->cBlock, 0, 4096);
 		node->charNum = 0;
 		return node;
 	}
@@ -21,8 +22,9 @@ blockInfo *get_my_file_block(const std::string& database, const std::string& tab
 	return node;
 }
 
-blockInfo *get_my_new_block(const std::string& database, const std::string& table_name) {
-	int blockNum = -1;
+// blockNum == 0 --> search from beginning
+// else search after the blockNum
+blockInfo *get_my_new_block(const std::string& database, const std::string& table_name, int blockNum) {
 	blockInfo *node;
 	while (node = readBlock(table_name, ++blockNum, IndexFile)) {
 		if (node->cBlock[0] == '\0')
@@ -31,7 +33,10 @@ blockInfo *get_my_new_block(const std::string& database, const std::string& tabl
 	if (node == NULL)
 		node = get_new_block(table_name, IndexFile, blockNum);
 	node->charNum = 0;
+	memset(node->cBlock, 0, 4096);
 	return node;
 }
+
+
 
 

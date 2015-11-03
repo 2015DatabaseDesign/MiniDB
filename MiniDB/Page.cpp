@@ -1,40 +1,5 @@
 #include "Page.h"
-//Tuple::Tuple(char *dataStart, const Table* tabledesc)
-//{
-//	const vector<Field> &fields = tabledesc->fields;
-//	int offset = 0;
-//	for (int i = 0; i < fields.size(); i++)
-//	{
-//		Field f = fields[i];
-//		Data *data;
-//		//read bytes from dataStart into Data object including Int, Float and Char/string
-//		switch (f.type)
-//		{
-//		case DataType::INT: {
-//			int Integer;
-//			memcpy(&Integer, dataStart + offset, sizeof(int));
-//			data = new Int(Integer);
-//			break;
-//		}
-//		case DataType::FLOAT: {
-//			float FloatNumber;
-//			memcpy(&FloatNumber, dataStart + offset, sizeof(float));
-//			data = new Float(FloatNumber);
-//			break;
-//		}
-//		case DataType::CHAR: {
-//			char *charValue = new char[f.length];
-//			memcpy(charValue, dataStart + offset, f.length);	///!!!
-//			string str = charValue;
-//			data = new Char(str);
-//			break;
-//		}
-//		default:throw logic_error("Unsuported data type");
-//		}
-//		datas.push_back(data);
-//		offset += f.length;
-//	}
-//}
+#include <sstream>
 
 string Tuple::toString()const
 {
@@ -87,10 +52,7 @@ Tuple::Tuple(char *dataStart, const Table* tabledesc)
 		{
 		case DataType::INT: {
 			int Integer;
-	/*		memcpy(&Integer, dataStart + offset+1, sizeof(int));
-			memcpy(&Integer, dataStart + offset - 1, sizeof(int));*/
 			memcpy(&Integer, dataStart + offset , sizeof(int));
-			//memcpy(&Integer, &(dataStart[offset]), sizeof(int));
 
 			data = make_shared<Int>(Integer);
 			break;
@@ -120,7 +82,7 @@ void Tuple::writeData(char *dataToWrite, const Table* table) const
 {
 	int offset = 0;
 	char *dest = dataToWrite; //destination
-	for (int i = 0; i < datas.size();i++)
+	for (unsigned i = 0; i < datas.size();i++)
 	{
 		int len = table->getFieldInfoAtIndex(i).length;
 		if (table->getFieldInfoAtIndex(i).type == DataType::CHAR)
@@ -178,20 +140,20 @@ ostream &operator<<(ostream &os, const Tuple &t)
 		case DataType::INT: {
 			int Integer;
 			memcpy(&Integer, t.datas[i]->getValue(), sizeof(int));
-			os << std::setw(8) << Integer;
+			os << left << std::setw(8) << dec <<  Integer;
 			break;
 		}
 		case DataType::FLOAT: {
 			float FloatNumber;
 			memcpy(&FloatNumber, t.datas[i]->getValue(), sizeof(float));
-			os << std::setw(8) << FloatNumber;
+			os << left << std::setw(10) << FloatNumber;
 			break;
 		}
 		case DataType::CHAR: {
 			char *charValue = new char[t.datas[i]->getLength()];
 			memcpy(charValue, t.datas[i]->getValue(), t.datas[i]->getLength());	///!!!
 			string str(charValue, t.datas[i]->getLength());
-			os << std::setw(8) << str;
+			os << left << std::setw(12) << str;
 			delete charValue;
 			break;
 		}
@@ -215,6 +177,38 @@ bool operator==(const Tuple& t0, const Tuple &t1)
 shared_ptr<Data> Tuple::getData(int index) const
 {
 	return datas[index];
+}
+
+string Tuple::getValueStr(int index) const
+{
+	shared_ptr<Data> data = datas[index];
+	std::stringstream ss;
+	string output;
+	switch (data->getType())
+	{
+	case DataType::INT: {
+		int Integer;
+		memcpy(&Integer, data->getValue(), sizeof(int));
+		ss << Integer;
+		break;
+	}
+	case DataType::FLOAT: {
+		float FloatNumber;
+		memcpy(&FloatNumber, data->getValue(), sizeof(float));
+		ss << FloatNumber;
+		break;
+	}
+	case DataType::CHAR: {
+		char *charValue = new char[data->getLength()];
+		memcpy(charValue, data->getValue(), data->getLength());	///!!!
+		string str(charValue, data->getLength());
+		delete charValue;
+		ss << str;
+		break;
+	}
+	}
+	ss >> output;
+	return output;
 }
 
 Tuple::~Tuple()

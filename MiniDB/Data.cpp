@@ -6,6 +6,7 @@
 */
 
 #include "Data.h"
+#include <sstream>
 Data::Data(unsigned _type, unsigned _length) :
 	type(_type), length(_length) {
 
@@ -18,7 +19,7 @@ Data::~Data() {
 int Data::getType() const {
 	return type;
 }
-unsigned Data::getLength() const{
+unsigned Data::getLength() const {
 	return length;
 }
 
@@ -41,7 +42,7 @@ void * Int::getValue() const
 	return (void *)&value;
 }
 
-Float::Float(float _value):
+Float::Float(float _value) :
 	Data(FLOAT, sizeof(float)), value(_value) {
 }
 
@@ -50,7 +51,7 @@ Float::~Float() {
 
 
 void* Float::getValue() const {
-	return (void* )&value;
+	return (void*)&value;
 }
 
 Char::Char(string _value) :
@@ -63,8 +64,8 @@ Char::Char(string _value) :
 Char::~Char() {
 }
 
-void* Char::getValue() const{
-	return (void* )value;
+void* Char::getValue() const {
+	return (void*)value;
 }
 
 //add by hedejin 10/28
@@ -181,12 +182,23 @@ bool Char::compare(Op op, const Data * data)
 	}
 	}
 }
-//
+
 ostream &operator<<(ostream &os, const Table &t)
 {
+	string Attrs[3] = { "INT", "FLOAT", "CHAR" };
+	std::stringstream ss;
+	
 	for (auto f : t.fields)
 	{
-		os << std::setw(8) << f.name;
+		string output = f.name + ":" + Attrs[f.type];
+		if (f.type == CHAR)
+		{
+			ss << f.length;
+			string str;
+			ss >> str;
+			output += "(" + str + ")";
+		}
+		os << left << setw(5) << std::setw(output.size() + 3) << output;
 	}
 	return os;
 }
@@ -208,7 +220,7 @@ int Table::getIndexOf(string name)const {
 
 bool Table::findField(string _name)
 {
-	for (size_t i = 0; i<fields.size(); i++)
+	for (size_t i = 0; i < fields.size(); i++)
 	{
 		if (fields[i].name.compare(_name) == 0)
 		{
@@ -218,19 +230,22 @@ bool Table::findField(string _name)
 	return false;
 }
 
-Field& Table::getFieldInfo(string _name)
+const Field& Table::getFieldInfo(string _name) const
 {
 	size_t i;
-	for (i = 0; i<fields.size(); i++)
+	for (i = 0; i < fields.size(); i++)
 	{
 		if (fields[i].name.compare(_name) == 0) break;
 	}
-	Field& f = fields[i];
+	const Field& f = fields[i];
 	return f;
 }
 
 const Field& Table::getFieldInfoAtIndex(size_t index) const
 {
+	if (index >= fields.size()) 
+		throw(TableException("too many fields"));
+
 	const Field& f = fields[index];
 	return f;
 }

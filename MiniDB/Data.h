@@ -113,7 +113,7 @@ public:
 	int getKeyIndex();
 	int getIndexOf(string name)const;
 	bool findField(string _name);
-	Field& getFieldInfo(string _name);
+	const Field& getFieldInfo(string _name)const;
 	const Field& getFieldInfoAtIndex(size_t index) const;
 	void show();
 

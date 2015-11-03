@@ -32,6 +32,7 @@ public:
 	Tuple(char *dataStart, const Table*);
 	void writeData(char* dataToWrite, const Table *table) const;
 	shared_ptr<Data> getData(int index) const;
+	string getValueStr(int index) const;
 	virtual ~Tuple();
 };
 

@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "mystr.h"
+#include <sstream>
 using namespace std;
 
 int StrToI(const string& s) {
@@ -11,16 +12,26 @@ int StrToI(const string& s) {
 	return m;
 }
 
+//const string IToStr(int n, int length) {
+//	char *s = (char *)malloc(sizeof(char) * (length + 1));
+//	s[length] = '\0';
+//	for (int i = length - 1; i >= 0; i--) {
+//		s[i] = n % 10 + '0';
+//		n /= 10;
+//	}
+//	string ss(s);
+//	free(s);
+//	return ss;
+//}
+
 const string IToStr(int n, int length) {
-	char *s = (char *)malloc(sizeof(char) * (length + 1));
-	s[length] = '\0';
-	for (int i = length - 1; i >= 0; i--) {
-		s[i] = n % 10 + '0';
-		n /= 10;
-	}
-	string ss(s);
-	free(s);
-	return ss;
+	std::stringstream ss;
+	ss << n;
+	string output;
+	ss >> output;
+	while (output.size() < length)
+		output = "0" + output;
+	return output;
 }
 
 int FindFirstNon0(const string& s) {

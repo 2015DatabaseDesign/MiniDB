@@ -36,76 +36,28 @@ public:
 
 	bool deleteAll(string _name);
 	void setIndex(Table* table, string indexname, int i, bool hasIndex) {
-		char buffer[23];
+		char buffer[24];
 		table->fields[i].hasIndex = true;
 		table->fields[i].indexname = indexname;
-		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
-		fCatalog.read(buffer, 23);
+		fCatalog.seekg(table->locationOfTable + 48 + 24 * i, ios::beg);
+		fCatalog.read(buffer, 24);
 		buffer[12] = hasIndex ? 1 : 0;
-		fCatalog.seekp(-23, ios::cur);
-		fCatalog.write(buffer, 23);
+		strcpy(buffer + 16, indexname.data());
+		fCatalog.seekp(-24, ios::cur);
+		fCatalog.write(buffer, 24);
+		table->show();
 	}
 
 	void dropIndex(Table* table, string indexname, int i, bool hasIndex) {
-		char buffer[23];
+		char buffer[24];
 		table->fields[i].hasIndex = false;
 		table->fields[i].indexname = "noindex";
-		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
-		fCatalog.read(buffer, 23);
+		fCatalog.seekg(table->locationOfTable + 48 + 24 * i, ios::beg);
+		fCatalog.read(buffer, 24);
 		buffer[12] = hasIndex ? 1 : 0;
-		fCatalog.seekp(-23, ios::cur);
-		fCatalog.write(buffer, 23);
+		strcpy(buffer + 16, "noindex");
+		fCatalog.seekp(-24, ios::cur);
+		fCatalog.write(buffer, 24);
 	}
 };
-
-//class CatalogManager {
-//private:
-//	fstream fCatalog;
-//	void init(unsigned numOfBlock);
-//	int findNextEmptyTable();
-//public:
-//	CatalogManager();
-//	virtual ~CatalogManager();
-//
-//	void displayAllTable();
-//	bool findTable(string name);
-//	bool dropTable(string name);
-//	Table* getTableInfo(string name);
-//	bool creatTable(string name, vector<Field> fields);
-//	void verifyFirstDataLocation(int tableLocation, int newLocation);
-//	vector<string> getAllTable();
-//
-//	bool deleteAll(string _name);
-//	//void setIndex(Table* table, int i, bool hasIndex) {
-//	//	char buffer[16];
-//	//	table->fields[i].hasIndex = true;
-//	//	fCatalog.seekg(table->locationOfTable + 32 + 16 * i, ios::beg);
-//	//	fCatalog.read(buffer, 16);
-//	//	buffer[12] = hasIndex ? 1 : 0;
-//	//	fCatalog.seekp(-16, ios::cur);
-//	//	fCatalog.write(buffer, 16);
-//	//}
-//	void setIndex(Table* table, string indexname, int i, bool hasIndex) {
-//		char buffer[23];
-//		table->fields[i].hasIndex = true;
-//		table->fields[i].indexname = indexname;
-//		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
-//		fCatalog.read(buffer, 23);
-//		buffer[12] = hasIndex ? 1 : 0;
-//		fCatalog.seekp(-23, ios::cur);
-//		fCatalog.write(buffer, 23);
-//	}
-//
-//	void dropIndex(Table* table, string indexname, int i, bool hasIndex) {
-//		char buffer[23];
-//		table->fields[i].hasIndex = false;
-//		table->fields[i].indexname = "noindex";
-//		fCatalog.seekg(table->locationOfTable + 32 + 23 * i, ios::beg);
-//		fCatalog.read(buffer, 23);
-//		buffer[12] = hasIndex ? 1 : 0;
-//		fCatalog.seekp(-23, ios::cur);
-//		fCatalog.write(buffer, 23);
-//	}
-//};
-
 #endif /* CATALOGMANAGER_CATALOGMANAGER_H_ */

@@ -1,5 +1,7 @@
 #include "CatalogManager.h"
 
+
+
 CatalogManager::CatalogManager() {
 	fCatalog.open(FCATALOG.c_str(), ios::in | ios::out | ios::binary);
 	if (!fCatalog.is_open()) {
@@ -39,39 +41,39 @@ void CatalogManager::init(unsigned numOfBlock) {
 
 }
 int CatalogManager::findNextEmptyTable() {
-	char buffer[23];
+	char buffer[24];
 	for (int i = 0;; i++) {
-		fCatalog.seekg(FIRST_TABLE_LOCATION + 0x17 * i, ios::beg);
-		fCatalog.read(buffer, 23);
+		fCatalog.seekg(FIRST_TABLE_LOCATION + 0x18 * i, ios::beg);
+		fCatalog.read(buffer, 24);
 		if (fCatalog.eof())
 			break;
 
 		if (buffer[0] == 0x0 && buffer[3] == 0) {
-			//read偏移
-			fCatalog.seekg(FIRST_TABLE_LOCATION + 0x17 * i, ios::beg);
-			return FIRST_TABLE_LOCATION + 0x17 * i;
+			//read浼氶?犳垚鍋忕Щ
+			fCatalog.seekg(FIRST_TABLE_LOCATION + 0x18 * i, ios::beg);
+			return FIRST_TABLE_LOCATION + 0x18 * i;
 		}
 		//else if(buffer[0] == DATA_END)throw(RecordException("No space"));
 	}
 	return 0;
 }
 bool CatalogManager::creatTable(string name, vector<Field> fields) {
-	if (name.length() > 14)
+	if (name.length() > 22)
 		throw(CatalogException("Name is too long"));
 	if (findTable(name)) {
-		cout << name << " Table already exist!" << endl;
+		cout << name << " Table exist!" << endl;
 		return false;
 	}
 	int locationOfTable = findNextEmptyTable();
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (unsigned i = 0; i < name.length(); i++) {
 		buffer[i] = name[i];
 	}
 	buffer[name.length()] = 0;
 	//<32
-	buffer[15] = fields.size();
-	fCatalog.write(buffer, 23);
-	//将int保存至4位BYTE中
+	buffer[23] = fields.size();
+	fCatalog.write(buffer, 24);
+	//灏唅nt淇濆瓨鑷?4浣岯YTE涓?
 	memcpy(buffer, &locationOfTable, 4);
 	int size = 0;
 	for (vector<Field>::iterator iter = fields.begin(); iter != fields.end();
@@ -83,15 +85,14 @@ bool CatalogManager::creatTable(string name, vector<Field> fields) {
 		else if (iter->type == CHAR)
 			size += iter->length;
 	}
-	//字节长度
+	//瀛楄妭闀垮害
 	memcpy(buffer + 4, &size, 4);
-	for (unsigned i = 8; i < 23; i++)
+	for (unsigned i = 8; i < 24; i++)
 		buffer[i] = 0;
-	fCatalog.write(buffer, 23);
+	fCatalog.write(buffer, 24);
 
-	for (vector<Field>::iterator iter = fields.begin(); iter != fields.end();
-	iter++) {
-		if (iter->name.length() > 11)
+	for (vector<Field>::iterator iter = fields.begin(); iter != fields.end(); iter++) {
+		if (iter->name.length() > 19)
 			throw(CatalogException("Name is too long"));
 		for (unsigned i = 0; i < iter->name.length(); i++) {
 			buffer[i] = iter->name[i];
@@ -101,24 +102,24 @@ bool CatalogManager::creatTable(string name, vector<Field> fields) {
 		buffer[13] = iter->type;
 		buffer[14] = iter->length;
 		buffer[15] = iter->attribute;
-		strncpy(buffer + 16, iter->indexname.c_str(), 7);
-		fCatalog.write(buffer, 23);
-		for (unsigned i = 0; i < 23; i++)
+		strncpy(buffer + 16, iter->indexname.c_str(), 8);
+		fCatalog.write(buffer, 24);
+		for (unsigned i = 0; i < 24; i++)
 			buffer[i] = 0;
 	}
 	buffer[0] = DATA_END;
-	for (unsigned i = 1; i < 23; i++)
+	for (unsigned i = 1; i < 24; i++)
 		buffer[i] = 0;
-	fCatalog.write(buffer, 23);
+	fCatalog.write(buffer, 24);
 	cout << name << " table is created successfully!" << endl;
 	return true;
 }
 
 void CatalogManager::displayAllTable() {
 	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (;;) {
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == 0x0) {
 			return;
 		}
@@ -127,11 +128,11 @@ void CatalogManager::displayAllTable() {
 		string name(buffer);
 
 		cout << " Table " << name << "  NumOfField:"
-			<< (unsigned int)(*(unsigned char*)(&buffer[15])) << endl;
-		fCatalog.read(buffer, 23);
+			<< (unsigned int)(*(unsigned char*)(&buffer[23])) << endl;
+		fCatalog.read(buffer, 24);
 
 		for (;;) {
-			fCatalog.read(buffer, 23);
+			fCatalog.read(buffer, 24);
 			if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 				|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 				== DELETE)
@@ -141,7 +142,7 @@ void CatalogManager::displayAllTable() {
 			cout << "		" << name << "\n" << "		" << "type:" << (int)buffer[13]
 				<< "\n" << "		" << "length:" << (int)buffer[14] << "\n"
 				<< "		" << "attribute:" << (int)buffer[15] << "\n"
-				<< "		" << "indexname:" << indexname << "\n" << endl;
+				<< "		" << "indexname:" << indexname << endl;
 		}
 	}
 	/*vector<string> names = getAllTable();
@@ -152,9 +153,9 @@ void CatalogManager::displayAllTable() {
 vector<string> CatalogManager::getAllTable() {
 	vector<string> names;
 	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (;;) {
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == 0x0) {
 			return names;
 		}
@@ -162,10 +163,10 @@ vector<string> CatalogManager::getAllTable() {
 			continue;
 		names.push_back(string(buffer));
 
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 
 		for (;;) {
-			fCatalog.read(buffer, 23);
+			fCatalog.read(buffer, 24);
 			if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 				|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 				== DELETE)break;
@@ -175,9 +176,9 @@ vector<string> CatalogManager::getAllTable() {
 }
 bool CatalogManager::findTable(string _name) {
 	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (;;) {
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 		if (buffer[0] == 0x0) {//&& buffer[3] == 0
 			return false;
 		}
@@ -186,38 +187,37 @@ bool CatalogManager::findTable(string _name) {
 		string name(buffer);
 		if (_name == name)
 			return true;
-		//跳过table内容
-		fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
+		//璺宠繃table鍐呭
+		fCatalog.seekg((buffer[23] + 2) * 24, ios::cur);
 	}
 	return false;
 }
 
 Table* CatalogManager::getTableInfo(string _name) {
 	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (;;) {
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 		if (buffer[0] == 0x0) {// && buffer[3] == 0
 			return NULL;
 		}
 		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DELETE)
 			continue;
 		string name(buffer);
-
 		if (_name == name) {
 
-			fCatalog.read(buffer, 23);
+			fCatalog.read(buffer, 24);
 			int locationOfTable;
 			memcpy(&locationOfTable, buffer, 4);
 			int size;
 			memcpy(&size, buffer + 4, 4);
 			int locationOfData;
-
+			;
 			memcpy(&locationOfData, buffer + 8, 4);
 
 			vector<Field> fields;
 			for (;;) {
-				fCatalog.read(buffer, 23);
+				fCatalog.read(buffer, 24);
 				if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 					|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 					== DELETE)
@@ -234,17 +234,17 @@ Table* CatalogManager::getTableInfo(string _name) {
 				locationOfData);
 
 		}
-		//跳过table内容
-		fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
+		//璺宠繃table鍐呭
+		fCatalog.seekg((buffer[23] + 2) * 24, ios::cur);
 	}
 	return NULL;
 }
 
 bool CatalogManager::dropTable(string _name) {
 	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-	char buffer[23] = { 0 };
+	char buffer[24] = { 0 };
 	for (;;) {
-		fCatalog.read(buffer, 23);
+		fCatalog.read(buffer, 24);
 		if (buffer[0] == 0x0) {//&& buffer[3] == 0
 			return true;
 		}
@@ -255,30 +255,25 @@ bool CatalogManager::dropTable(string _name) {
 		if (_name == name) {
 			//cout << "find " << endl;
 			buffer[0] = DELETE;
-			int numOfField = (unsigned int)(*(unsigned char*)(&buffer[15]));
-			fCatalog.seekg(-23, ios::cur);
-			fCatalog.write(buffer, 23);
+			int numOfField = (unsigned int)(*(unsigned char*)(&buffer[23]));
+			fCatalog.seekg(-24, ios::cur);
+			fCatalog.write(buffer, 24);
 			for (int i = 0; i < numOfField + 2; i++) {
-				fCatalog.write(buffer, 23);
+				fCatalog.write(buffer, 24);
 			}
-			//跳过table内容
-			fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
+			//璺宠繃table鍐呭
+			fCatalog.seekg((numOfField + 2) * 24, ios::cur);
 		}
 	}
 	return false;
 }
 
-void CatalogManager::verifyFirstDataLocation(int tableLocation,
-	int newLocation) {
-	fCatalog.seekg(tableLocation + 0x1F, ios::beg);
-	fCatalog.write((char*)&newLocation, sizeof(int));
-}
 bool CatalogManager::deleteAll(string _name) {
 	if (findTable(_name))
 	{
 		Table* table = getTableInfo(_name);
 		const int zero = 0;
-		fCatalog.seekp(table->locationOfTable + 0x1F, ios::beg);
+		fCatalog.seekp(table->locationOfTable + 0x20, ios::beg);
 		fCatalog.write((char *)&zero, sizeof(int));
 		cout << "Delete successfully! One table affected!" << endl;
 		return true;
@@ -288,16 +283,17 @@ bool CatalogManager::deleteAll(string _name) {
 	}
 }
 
+
 //
 //CatalogManager::CatalogManager() {
 //	fCatalog.open(FCATALOG.c_str(), ios::in | ios::out | ios::binary);
 //	if (!fCatalog.is_open()) {
-//		cout << "Database File Not Found. Creat Now!" << sizeof(char) << endl;
+//		cout << "Database File Not Found. Create Now!" << sizeof(char) << endl;
 //		init(256);
 //		fCatalog.open(FCATALOG.c_str(), ios::in | ios::out | ios::binary);
 //		if (!fCatalog.is_open()) {
 //			//No exception in construction.
-//			cout << "Fail to creat database file." << endl;
+//			cout << "Fail to create database file." << endl;
 //			return;
 //		}
 //	}
@@ -328,17 +324,17 @@ bool CatalogManager::deleteAll(string _name) {
 //
 //}
 //int CatalogManager::findNextEmptyTable() {
-//	char buffer[16];
+//	char buffer[23];
 //	for (int i = 0;; i++) {
-//		fCatalog.seekg(FIRST_TABLE_LOCATION + 0x10 * i, ios::beg);
-//		fCatalog.read(buffer, 16);
+//		fCatalog.seekg(FIRST_TABLE_LOCATION + 0x17 * i, ios::beg);
+//		fCatalog.read(buffer, 23);
 //		if (fCatalog.eof())
 //			break;
 //
 //		if (buffer[0] == 0x0 && buffer[3] == 0) {
-//			//read会造成偏移
-//			fCatalog.seekg(FIRST_TABLE_LOCATION + 0x10 * i, ios::beg);
-//			return FIRST_TABLE_LOCATION + 0x10 * i;
+//			//read偏移
+//			fCatalog.seekg(FIRST_TABLE_LOCATION + 0x17 * i, ios::beg);
+//			return FIRST_TABLE_LOCATION + 0x17 * i;
 //		}
 //		//else if(buffer[0] == DATA_END)throw(RecordException("No space"));
 //	}
@@ -348,18 +344,18 @@ bool CatalogManager::deleteAll(string _name) {
 //	if (name.length() > 14)
 //		throw(CatalogException("Name is too long"));
 //	if (findTable(name)) {
-//		cout << name << " Table exist!" << endl;
+//		cout << name << " Table already exist!" << endl;
 //		return false;
 //	}
 //	int locationOfTable = findNextEmptyTable();
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (unsigned i = 0; i < name.length(); i++) {
 //		buffer[i] = name[i];
 //	}
 //	buffer[name.length()] = 0;
 //	//<32
 //	buffer[15] = fields.size();
-//	fCatalog.write(buffer, 16);
+//	fCatalog.write(buffer, 23);
 //	//将int保存至4位BYTE中
 //	memcpy(buffer, &locationOfTable, 4);
 //	int size = 0;
@@ -374,9 +370,9 @@ bool CatalogManager::deleteAll(string _name) {
 //	}
 //	//字节长度
 //	memcpy(buffer + 4, &size, 4);
-//	for (unsigned i = 8; i < 16; i++)
+//	for (unsigned i = 8; i < 23; i++)
 //		buffer[i] = 0;
-//	fCatalog.write(buffer, 16);
+//	fCatalog.write(buffer, 23);
 //
 //	for (vector<Field>::iterator iter = fields.begin(); iter != fields.end();
 //	iter++) {
@@ -390,23 +386,24 @@ bool CatalogManager::deleteAll(string _name) {
 //		buffer[13] = iter->type;
 //		buffer[14] = iter->length;
 //		buffer[15] = iter->attribute;
-//		fCatalog.write(buffer, 16);
-//		for (unsigned i = 0; i < 16; i++)
+//		strncpy(buffer + 16, iter->indexname.c_str(), 7);
+//		fCatalog.write(buffer, 23);
+//		for (unsigned i = 0; i < 23; i++)
 //			buffer[i] = 0;
 //	}
 //	buffer[0] = DATA_END;
-//	for (unsigned i = 1; i < 16; i++)
+//	for (unsigned i = 1; i < 23; i++)
 //		buffer[i] = 0;
-//	fCatalog.write(buffer, 16);
+//	fCatalog.write(buffer, 23);
 //	cout << name << " table is created successfully!" << endl;
 //	return true;
 //}
 //
 //void CatalogManager::displayAllTable() {
 //	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (;;) {
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == 0x0) {
 //			return;
 //		}
@@ -416,18 +413,20 @@ bool CatalogManager::deleteAll(string _name) {
 //
 //		cout << " Table " << name << "  NumOfField:"
 //			<< (unsigned int)(*(unsigned char*)(&buffer[15])) << endl;
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //
 //		for (;;) {
-//			fCatalog.read(buffer, 16);
+//			fCatalog.read(buffer, 23);
 //			if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 //				|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 //				== DELETE)
 //				break;
 //			name = string(buffer);
+//			string indexname(buffer + 16);
 //			cout << "		" << name << "\n" << "		" << "type:" << (int)buffer[13]
 //				<< "\n" << "		" << "length:" << (int)buffer[14] << "\n"
-//				<< "		" << "attribute:" << (int)buffer[15] << "\n" << endl;
+//				<< "		" << "attribute:" << (int)buffer[15] << "\n"
+//				<< "		" << "indexname:" << indexname << "\n" << endl;
 //		}
 //	}
 //	/*vector<string> names = getAllTable();
@@ -438,9 +437,9 @@ bool CatalogManager::deleteAll(string _name) {
 //vector<string> CatalogManager::getAllTable() {
 //	vector<string> names;
 //	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (;;) {
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == 0x0) {
 //			return names;
 //		}
@@ -448,10 +447,10 @@ bool CatalogManager::deleteAll(string _name) {
 //			continue;
 //		names.push_back(string(buffer));
 //
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //
 //		for (;;) {
-//			fCatalog.read(buffer, 16);
+//			fCatalog.read(buffer, 23);
 //			if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 //				|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 //				== DELETE)break;
@@ -461,9 +460,9 @@ bool CatalogManager::deleteAll(string _name) {
 //}
 //bool CatalogManager::findTable(string _name) {
 //	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (;;) {
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //		if (buffer[0] == 0x0) {//&& buffer[3] == 0
 //			return false;
 //		}
@@ -473,64 +472,64 @@ bool CatalogManager::deleteAll(string _name) {
 //		if (_name == name)
 //			return true;
 //		//跳过table内容
-//		fCatalog.seekg((buffer[15] + 2) * 16, ios::cur);
+//		fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
 //	}
 //	return false;
 //}
 //
 //Table* CatalogManager::getTableInfo(string _name) {
 //	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (;;) {
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //		if (buffer[0] == 0x0) {// && buffer[3] == 0
 //			return NULL;
 //		}
 //		if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DELETE)
 //			continue;
 //		string name(buffer);
+//
 //		if (_name == name) {
 //
-//			fCatalog.read(buffer, 16);
+//			fCatalog.read(buffer, 23);
 //			int locationOfTable;
 //			memcpy(&locationOfTable, buffer, 4);
 //			int size;
 //			memcpy(&size, buffer + 4, 4);
 //			int locationOfData;
-//			;
+//
 //			memcpy(&locationOfData, buffer + 8, 4);
 //
 //			vector<Field> fields;
 //			for (;;) {
-//				fCatalog.read(buffer, 16);
+//				fCatalog.read(buffer, 23);
 //				if ((unsigned int)(*(unsigned char*)(&buffer[0])) == DATA_END
 //					|| (unsigned int)(*(unsigned char*)(&buffer[0]))
 //					== DELETE)
 //					break;
 //				name = string(buffer);
+//				string indexname(buffer + 16);
 //				bool hasIndex = ((unsigned int)(*(unsigned char*)(&buffer[12]))) == 0 ? false : true;
 //				int type = (unsigned int)(*(unsigned char*)(&buffer[13]));
 //				int length = (unsigned int)(*(unsigned char*)(&buffer[14]));
 //				int attribute = (unsigned int)(*(unsigned char*)(&buffer[15]));
-//				fields.push_back(Field(name, type, attribute, length, hasIndex));
+//				fields.push_back(Field(name, type, attribute, length, hasIndex, indexname));
 //			}
-//			Table* table = new Table(_name, fields, size, locationOfTable,
+//			return new Table(_name, fields, size, locationOfTable,
 //				locationOfData);
-//			/*table->show();*/
-//			return table;
 //
 //		}
 //		//跳过table内容
-//		fCatalog.seekg((buffer[15] + 2) * 16, ios::cur);
+//		fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
 //	}
 //	return NULL;
 //}
 //
 //bool CatalogManager::dropTable(string _name) {
 //	fCatalog.seekg(FIRST_TABLE_LOCATION, ios::beg);
-//	char buffer[16] = { 0 };
+//	char buffer[23] = { 0 };
 //	for (;;) {
-//		fCatalog.read(buffer, 16);
+//		fCatalog.read(buffer, 23);
 //		if (buffer[0] == 0x0) {//&& buffer[3] == 0
 //			return true;
 //		}
@@ -542,13 +541,13 @@ bool CatalogManager::deleteAll(string _name) {
 //			//cout << "find " << endl;
 //			buffer[0] = DELETE;
 //			int numOfField = (unsigned int)(*(unsigned char*)(&buffer[15]));
-//			fCatalog.seekg(-16, ios::cur);
-//			fCatalog.write(buffer, 16);
+//			fCatalog.seekg(-23, ios::cur);
+//			fCatalog.write(buffer, 23);
 //			for (int i = 0; i < numOfField + 2; i++) {
-//				fCatalog.write(buffer, 16);
+//				fCatalog.write(buffer, 23);
 //			}
 //			//跳过table内容
-//			fCatalog.seekg((numOfField + 2) * 16, ios::cur);
+//			fCatalog.seekg((buffer[22] + 2) * 23, ios::cur);
 //		}
 //	}
 //	return false;
@@ -556,7 +555,7 @@ bool CatalogManager::deleteAll(string _name) {
 //
 //void CatalogManager::verifyFirstDataLocation(int tableLocation,
 //	int newLocation) {
-//	fCatalog.seekg(tableLocation + 0x18, ios::beg);
+//	fCatalog.seekg(tableLocation + 0x1F, ios::beg);
 //	fCatalog.write((char*)&newLocation, sizeof(int));
 //}
 //bool CatalogManager::deleteAll(string _name) {
@@ -564,7 +563,7 @@ bool CatalogManager::deleteAll(string _name) {
 //	{
 //		Table* table = getTableInfo(_name);
 //		const int zero = 0;
-//		fCatalog.seekp(table->locationOfTable + 0x18, ios::beg);
+//		fCatalog.seekp(table->locationOfTable + 0x1F, ios::beg);
 //		fCatalog.write((char *)&zero, sizeof(int));
 //		cout << "Delete successfully! One table affected!" << endl;
 //		return true;
@@ -573,4 +572,3 @@ bool CatalogManager::deleteAll(string _name) {
 //		return false;
 //	}
 //}
-//

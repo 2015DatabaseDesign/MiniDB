@@ -1,34 +1,102 @@
 #include "MiniDB.h"
+#include "io.h"
 #include <regex>
 
 
-
-void MiniDB::Print(Selector & selector, const Table* tableDesc)
+#include <sstream>
+void MiniDB::Print(Selector & selector, const Table* tableDesc, const vector<string> &AttrsName)
 {
+	string Attrs[3] = { "INT", "FLOAT", "CHAR" };
 	bool first = true;
+	int cnt = 0;
 	while (selector.hasNext())
 	{
+		cnt++;
 		if (first)
 		{
-			cout << *tableDesc << endl;
+			std::cout << left << setw(5) << "";
+			for (string AttrName : AttrsName)
+			{
+				const Field &f = tableDesc->getFieldInfo(AttrName);
+				string output = f.name + ":" + Attrs[f.type];
+				if (f.type == CHAR)
+				{
+					stringstream ss;
+					ss << f.length;
+					string str;
+					ss >> str;
+					output += "(" + str + ")";
+				}
+				std::cout << left << setw(5) << std::setw(output.size() + 3) << output;
+			}
 			first = false;
+			std::cout << endl;
 		}
-		const Tuple& t = selector.next();
-		cout << t << endl;
-	}
-}
 
-void MiniDB::getCondsAndLinkOp(char ** input, int size, byte func, const Table* table, vector<Condition>& conds, LinkOp & lop)
+		const Tuple& t = selector.next();
+		std::cout << left << setw(5) << cnt;
+		for (string AttrName : AttrsName)
+		{
+			int i = tableDesc->getIndexOf(AttrName);
+			//decide data type and print
+			switch (t.datas[i]->getType())
+			{
+			case DataType::INT: {
+				int Integer;
+				memcpy(&Integer, t.datas[i]->getValue(), sizeof(int));
+				std::cout << left << std::setw(8) << dec << Integer;
+				break;
+			}
+			case DataType::FLOAT: {
+				float FloatNumber;
+				memcpy(&FloatNumber, t.datas[i]->getValue(), sizeof(float));
+				std::cout << left << std::setw(10) << FloatNumber;
+				break;
+			}
+			case DataType::CHAR: {
+				char *charValue = new char[t.datas[i]->getLength()];
+				memcpy(charValue, t.datas[i]->getValue(), t.datas[i]->getLength());	///!!!
+				string str(charValue, t.datas[i]->getLength());
+				std::cout << left << std::setw(12) << str;
+				delete charValue;
+				break;
+			}
+			}
+		}
+		std::cout << endl;
+		//std::cout << left << setw(5) << cnt << t << endl;
+	}
+	std::cout << "REPORT: Command(s) completed successfully." << endl
+		<< setw(8) << "" << "(" << cnt << " row(s) affected.)" << endl;
+}
+//###
+void MiniDB::getCondsAndLinkOp(char ** input, int size, byte func, const Table* table, vector<Condition>& conds, LinkOp & lop, vector<string>& values)
 {
-	if (func & 0x80)
-		lop = LinkOp::AND;
+	if (size == 2)
+	{
+		lop = AND;
+	}
 	else
-		lop = LinkOp::OR;
+	{
+		if (func & 0x80)
+			lop = LinkOp::AND;
+		else
+			lop = LinkOp::OR;
+	}
+
 
 	int code1 = (int)(func & 0x7);
 	Op op = getOpFromFunc(code1);
-	string AttrName = input[1];
-	string toComp = input[2];
+	if (op < 0 || op >= 6)
+	{
+		std::cout << "ERROR: Column type of supplied values does not match table definition." << endl;
+		throw InvalidInputForConstructData();
+	}
+	//string attrname = input[1];
+	//string tocomp = input[2];
+	string AttrName = input[0];
+	string toComp = input[1];
+	values.push_back(toComp);
 	while (AttrName.back() == ' ') AttrName.pop_back();
 	int index = table->getIndexOf(AttrName);
 	if (index == -1)
@@ -36,18 +104,26 @@ void MiniDB::getCondsAndLinkOp(char ** input, int size, byte func, const Table* 
 		throw NoSuchAttributeInTable(AttrName, table->name);
 	}
 	shared_ptr<Data> data(getDataFromStr(toComp));
+	//if(data->getType() == CHAR && table->getFieldInfo(AttrName).type == INT)
+
 	Condition cond(op, data, index);
 	conds.push_back(cond);
 	int code2 = (int)((func >> 4) & 0x7);
 	if (code2 != 0)
 	{
 		Op op2 = getOpFromFunc(code2);
-		string AttrName = input[3];
-		string toComp = input[4];
-		int index = table->getIndexOf(AttrName);
+		if (op2 < 0 || op2 >= 6)
+		{
+			std::cout << "ERROR: Column type of supplied values does not match table definition." << endl;
+			return;
+		}
+		string AttrName = input[2];
+		string toComp = input[3];
+		values.push_back(toComp);
+		int index2 = table->getIndexOf(AttrName);
 		//Data* data = getDataFromStr(toComp);
-		shared_ptr<Data> data(getDataFromStr(toComp));
-		Condition cond(op, data, index);
+		shared_ptr<Data> data2(getDataFromStr(toComp));
+		Condition cond(op2, data2, index2);
 		conds.push_back(cond);
 	}
 
@@ -91,73 +167,110 @@ Op MiniDB::getOpFromFunc(int input)
 	case 4:return Op::GREATER_THAN; break;
 	case 5:return Op::LESS_THAN_OR_EQUAL; break;
 	case 6:return Op::GREATE_THAN_OR_EQUAL; break;
+		/*default:throw InvalidInputForConstructData();*/
 	}
 }
 
-vector<int> MiniDB::getLineNumsAndLeftConds(const Table* table, vector<Condition>& conds, LinkOp lop)
+vector<int> MiniDB::getLineNumsAndLeftConds(const Table* table, vector<Condition>& conds, LinkOp lop, const vector<string>& values, bool &useIndex)
 {
 	vector<int> LineNums;
 	vector<Condition> LeftConds;
 	bool first = true;
-	for (Condition cond : conds)
+	useIndex = false;
+	for (unsigned i = 0; i < conds.size(); i++)
 	{
+		Condition cond = conds[i];
 		int index = cond.getIndexOfData();
 		const Field& f = table->getFieldInfoAtIndex(index);
 		vector<int> Lines;
 
 		if (f.hasIndex)	//if this condition can make the use of IndexManager, use it to get LineNums
 		{
+			useIndex = true;
+			Lines.clear();
 			Data* data = cond.getData();
-			struct index_info inform(table->name, f, (char *)(data->getValue()));
+			struct index_info inform(table->name, f, values[i].data());
+			string IndexFileName = table->name + "_" + f.name;
+			//bool getLine;
+			//if (cond.getOp() == Op::EQUALS && im.search_one(getDatabaseName(), IndexFileName, inform) >= 0) //if Op is equal, use search_one
+			//{
+			//	getLine = true;
+
+			//}
+			//else
+			//{
+			//	int start, end;
+			//	vector<int> LinesFromSearchMany;
+			//	im.search_many("###", IndexFileName, start, end, cond.getOp(), inform, LinesFromSearchMany);
+			//	getLine = (LinesFromSearchMany.size() > 0);
+
+			//}
 			if (cond.getOp() == Op::EQUALS) //if Op is equal, use search_one
 			{
-				im.search_one(getDatabaseName(), table->name, inform);
-				if (first)
-					LineNums.push_back(inform.offset);
-				else
+				if (im.search_one(getDatabaseName(), IndexFileName, inform) >= 0)
 					Lines.push_back(inform.offset);
 			}
 			else
 			{
-				throw MethodNotImplementException();
-				//im.search_many(DBName, table->name, );			//search_many not complete yet!!!
-				//LineNums.push_back(LineNum);
+				int start;
+				int end;
+				im.search_many("###", IndexFileName, start, end, cond.getOp(), inform, Lines);
+			}
+
+			if (i == 0)
+				LineNums = Lines;
+			else//if conditions are linked by AND,OR	
+			{
+				if (lop == LinkOp::AND) //calculate intersection between Lines get from condition using index and origin line numbers
+				{
+					vector<int> newLineNums(LineNums.size());
+					vector<int>::iterator it = set_intersection(LineNums.begin(), LineNums.end(), Lines.begin(), Lines.end(), newLineNums.begin());
+					newLineNums.resize(it - newLineNums.begin());
+					LineNums = newLineNums;
+				}
+				else//OR //calculate union between Lines get from condition using index and origin line numbers
+				{
+					vector<int> newLineNums(LineNums.size() + Lines.size());
+					vector<int>::iterator it = set_union(LineNums.begin(), LineNums.end(), Lines.begin(), Lines.end(), newLineNums.begin());
+					newLineNums.resize(it - newLineNums.begin());
+					LineNums = newLineNums;
+				}
 			}
 		}
 		else	//else store conditions in LeftConds
 		{
 			LeftConds.push_back(cond);
 		}
-
-		//if conditions are linked by AND,OR
-		if (!first)
-		{
-			if (lop == LinkOp::AND)
-			{
-				vector<int> newLineNums(LineNums.size());
-				vector<int>::iterator it = set_intersection(LineNums.begin(), LineNums.end(), Lines.begin(), Lines.end(), newLineNums.begin());
-				newLineNums.resize(it - newLineNums.begin());
-				LineNums = newLineNums;
-			}
-			else//OR
-			{
-				vector<int> newLineNums(LineNums.size() + Lines.size());
-				vector<int>::iterator it = set_union(LineNums.begin(), LineNums.end(), Lines.begin(), Lines.end(), newLineNums.begin());
-				newLineNums.resize(it - newLineNums.begin());
-				LineNums = newLineNums;
-			}
-		}
-
-		first = false;
+		//if (!first)
+		//first = false;
 	}
-
 	//return conditions left
 	conds = LeftConds;
 	return LineNums;
 }
 
+void MiniDB::exec_file(string &path) {
+	if (_access(path.data(), 0) == 0) {
+		FILE *exec_file = fopen(path.data(), "rt");
+		char SQL_c[200]; /* MAXWORDS */
+		while (fgets(SQL_c, 200 /*MAXWORDS*/, exec_file)) {
+			string SQL(SQL_c);
+			if (SQL.back() == '\n')
+				SQL.pop_back();
+			sql_node node = ip.Interpreter(SQL);
+			getOperation(node);
+		}
+	}
+	else
+		throw IllegalCommand(FileNotExist, path);
+}
+
 bool MiniDB::getOperation(const sql_node & node)
 {
+	if (node.m_type == EXEC)
+	{
+		exec_file(string(node.m_fa[0]));
+	}
 	if (node.m_type == CREATE_DATABASE)
 	{
 		createDatabase(node.m_fa[0]);
@@ -166,19 +279,24 @@ bool MiniDB::getOperation(const sql_node & node)
 
 	if (node.m_type != USE_SQL && getDatabaseName() == "")
 	{
-		cout << "Please input \"use db_name\" to indicate the name of database." << endl;
+		std::cout << "ERROR: No database is selected." << endl;
 		return false;
 	}
 
+	if (node.m_type == EXIT)
+	{
+		closeDatabase();
+		return true;
+	}
 	switch (node.m_type)
 	{
 	case USE_SQL: {
 		if (!useDatabase(string(node.m_fa[0])))
 		{
-			cout << "Database '" << node.m_fa[0] << "' Not Exists!" << endl;
+			std::cout << "ERROR: Database '" << node.m_fa[0] << "' does not exist!" << endl;
 			return false;
 		}
-		cout << getDatabaseName() << endl;
+		std::cout << getDatabaseName() << endl;
 		break;
 	}
 
@@ -201,7 +319,6 @@ bool MiniDB::getOperation(const sql_node & node)
 	}
 	case INSERT_SQL: {
 		Insert(node);
-		//closeFile(0);
 		break;
 	}
 
@@ -222,8 +339,8 @@ bool MiniDB::getOperation(const sql_node & node)
 		deleteDatabase(node.m_sa[0]);
 		break;
 	}
-
 	}
+
 	return true;
 }
 
@@ -234,7 +351,7 @@ void MiniDB::readinput()
 	getOperation(node);
 }
 
-void MiniDB::CreateTable(const sql_node & node)
+bool MiniDB::CreateTable(const sql_node & node)
 {
 	string TableName = node.m_fa[0];
 	vector<Field> fields;
@@ -285,33 +402,54 @@ void MiniDB::CreateTable(const sql_node & node)
 			fields.back().attribute = UNIQUE;
 	}
 
-	if (IsPrim == "primary")
+	if (IsPrim != "primary")
+	{
+		cm.creatTable(TableName, fields);
+		create_file(TableName, DataFile);
+	}
+	else
 	{
 		int len = node.m_sa_len;
 		string primarykeyField = node.m_sa[len - 2];
-		for (int i = 0; i < fields.size(); i++)
+		int keyIndex = -1;
+		for (unsigned i = 0; i < fields.size(); i++)
 		{
 			if (fields[i].name == primarykeyField)
 			{
 				fields[i].attribute = PRIMARY;
 				fields[i].hasIndex = true;
+				keyIndex = i;
+				break;
 			}
 		}
+
+		if (keyIndex == -1)
+		{
+			std::cout << "No attribute name " + primarykeyField + "in this table." << endl;
+			std::cout << "The statement has been terminated." << endl;
+			return false;
+		}
+
+		cm.creatTable(TableName, fields);
+		create_file(TableName, DataFile);
 		//!!!!!create index
-		/*  create index
-
-
-
-		*/
+		string IndexFileName = TableName + "_" + primarykeyField;
+		create_file(IndexFileName, IndexFile);
+		//updata catalogmanager
+		Table * table = cm.getTableInfo(TableName);
+		//### DefaultIndex is name of index automatically created when declared primary key
+		string DefaultIndexName = TableName + primarykeyField;
+		if (DefaultIndexName.size() > 7)
+		{
+			cout << "Catalog does not support index file name longer then 7" << endl;
+			return false;
+		}
+		cm.setIndex(table, DefaultIndexName, keyIndex, true);
 
 	}
-
-	cm.creatTable(TableName, fields);
-
-	create_file(TableName, DataFile);
 }
 
-void MiniDB::CreateIndex(const sql_node & node)
+bool MiniDB::CreateIndex(const sql_node & node)
 {
 	//need to check uniqueness
 	string IndexName = node.m_fa[0];
@@ -319,50 +457,95 @@ void MiniDB::CreateIndex(const sql_node & node)
 	string AttriName = node.m_ta[0];
 
 	Table *table = cm.getTableInfo(TableName);
-	int index = table->getIndexOf(AttriName);
-	Field field = table->getFieldInfoAtIndex(index);
-	if (field.attribute == PRIMARY)
+	if (table == NULL)
 	{
-		cout << "This attribute is primary key, index is created on it acquiescently when created table." << endl;
-		cout << "The statement has been terminated." << endl;
-	}
-	else if (field.attribute == NORMAL)
-	{
-		cout << "This attribute is not unique, index is only create on unique." << endl;
-		cout << "The statement has been terminated." << endl;
-	}
-	//cm.setIndex(table, index, true);
-	if (field.hasIndex)
-	{
-		cout << "There is an index already created on this attribute." << endl;
-		cout << "The statement has been terminated." << endl;
+		std::cout << "ERROR: Table '" << TableName << "' does not exist." << endl;
+		return false;
 	}
 	else
 	{
-		string IndexFileName = TableName + "_" + AttriName;
-		create_file(IndexFileName, IndexFile);
-		cm.setIndex(table, IndexName, index, true);
-		Selector selector(getDatabaseName(), TableName, table);
-		while (selector.hasNext())
+		int index = table->getIndexOf(AttriName);
+		Field field = table->getFieldInfoAtIndex(index);
+		if (field.attribute == PRIMARY)
 		{
-			const Tuple& t = selector.next();
-			struct index_info inform(TableName, field, (char *)(t.getData(index).get()));
-			inform.offset = selector.CurrentIndex - 1;
-			inform.value = string((char *)t.datas[index]->getValue());
-			/*
-			Pending.
-			*/
-			im.insert_one(getDatabaseName(), IndexFileName, inform);
+			std::cout << "ERROR: Default index has been created on primary key '" + field.name + "'." << endl;
+			return false;
 		}
-		//!!! call buffer manager to create a new file 
-		//create index_file
+		else if (field.attribute == NORMAL)
+		{
+			//std::cout << "This attribute is not unique, index is only create on unique." << endl;
+			std::cout << "ERROR: Unable to create index on non-unique attributes '" + field.name + "'." << endl;
+			return false;
+		}
+		//cm.setIndex(table, index, true);
+		if (field.hasIndex)
+		{
+			//std::cout << "There is an index already created on this attribute." << endl;
+			std::cout << "ERROR: Index has been created on attribute '" + field.name + "'." << endl;
+			return false;
+		}
+		else
+		{
+			//call buffermanager to create index file
+			string IndexFileName = TableName + "_" + AttriName;
+			create_file(IndexFileName, IndexFile);
+
+			//updata catalogmanager
+			cm.setIndex(table, IndexName, index, true);
+			//iterate tuples and insert one it index manager
+			Selector selector(getDatabaseName(), TableName, table);
+			while (selector.hasNext())
+			{
+				const Tuple& t = selector.next();
+				struct index_info inform(TableName, field, "###");
+				//inform.offset = selector.CurrentIndex - 1;
+				inform.offset = selector.CurrentIndex;
+				shared_ptr<Data> data = t.datas[index];
+				string value;
+				std::stringstream ss;
+				switch (data->getType())
+				{
+				case DataType::INT: {
+					int Integer;
+					memcpy(&Integer, data->getValue(), sizeof(int));
+					//std::cout << "Integer : " << Integer;
+					ss << Integer;
+					break;
+				}
+				case DataType::FLOAT: {
+					float FloatNumber;
+					memcpy(&FloatNumber, data->getValue(), sizeof(float));
+					//std::cout << "FloatNumber : " << FloatNumber;
+					ss << FloatNumber;
+					break;
+				}
+				case DataType::CHAR: {
+					char *charValue = new char[data->getLength()];
+					memcpy(charValue, data->getValue(), data->getLength());	///!!!
+					string str(charValue, data->getLength());
+					//std::cout << "Char : " << str;
+					ss << str;
+					delete charValue;
+					break;
+				}
+				}
+				ss >> value;
+				//std::cout << ">> Value : " << value << endl;
+				//inform.offset = selector.CurrentIndex - 1;
+				inform.offset = selector.CurrentIndex;
+				inform.value = value;
+				im.insert_one(getDatabaseName(), IndexFileName, inform);
+			}
+		}
+
 	}
+	return true;
 }
 
-void MiniDB::DropIndex(const sql_node & node)
+
+bool MiniDB::DropIndex(const sql_node & node)
 {
 	string IndexName = node.m_sa[0];
-	//throw MethodNotImplementException();
 	string IndexFileName;
 	const vector<string> &tableNames = cm.getAllTable();
 	bool found = false;
@@ -371,7 +554,7 @@ void MiniDB::DropIndex(const sql_node & node)
 		Table* table = cm.getTableInfo(name);
 		const vector<Field> &fields = table->fields;
 
-		for (int i = 0; i < fields.size(); i++)
+		for (unsigned i = 0; i < fields.size(); i++)
 		{
 			const Field &f = fields[i];
 			if (f.hasIndex && f.indexname == IndexName)
@@ -384,23 +567,50 @@ void MiniDB::DropIndex(const sql_node & node)
 		}
 		if (found)
 			break;
+		else
+		{
+			cout << "Index named" + IndexName + "does not exist. " << endl;
+			cout << "The statement has been terminated. " << endl;
+			return false;
+		}
 	}
 	//!!! call buffer manager to delete the index file
-	delete_file(IndexFileName, IndexFile);
+	return delete_file(IndexFileName, IndexFile) > 0;
 }
 
-void MiniDB::DropTable(const sql_node & node)
+bool MiniDB::DropTable(const sql_node & node)
 {
 	string TableName = node.m_sa[0];
 	//first delete tuples and indexs
-	//DeleteAll(TableName);                    ????
-	//and then delete information stored in CatalogManager
-	cm.dropTable(TableName);
-	//call buffer manager to delete file
-	delete_file(TableName, DataFile);
+	//DeleteAll(TableName);                   // ????
+	Table* table = cm.getTableInfo(TableName);
+	if (table == NULL)
+	{
+		std::cout << "ERROR: Table does not exist." << endl;
+		return false;
+	}
+	else
+	{
+		const vector<int> &TupleWithIndex = table->getTupleWithIndexs();
+		//get every tuple to delete and delete associated index
+		for (int ti : TupleWithIndex)
+		{
+			string indexname = table->getFieldInfoAtIndex(ti).indexname;
+			cm.dropIndex(table, indexname, ti, false); //
+			string IndexFileName = TableName + "_" + table->getFieldInfoAtIndex(ti).name;
+			delete_file(IndexFileName, IndexFile);
+		}
+		//and then delete information stored in CatalogManager
+		cm.dropTable(TableName);
+		//call buffer manager to delete file
+		int result = delete_file(TableName, DataFile);
+		std::cout << "REPORT: Command(s) completed successfully." << endl //+++
+			<< "(1 table(s) affected)" << endl;
+		return result > 0;
+	}
 }
 
-void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
+int MiniDB::InsertTuple(const string & TableName, const Tuple & t, char** valueStr, int valuelen)
 {
 	Table* table = cm.getTableInfo(TableName);
 	bool hasPrim = table->HasPrim();
@@ -414,24 +624,30 @@ void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
 		int keyIndex = table->getKeyIndex();
 
 		//construct index_info
-		char *value = (char *)(t.getData(keyIndex).get());
+		//char *value = (char *)(t.getData(keyIndex).get());
 		const Field &f = table->getFieldInfoAtIndex(keyIndex);
+		string IndexFileName = TableName + "_" + f.name;
+		char *value = valueStr[keyIndex];
 		struct index_info inform(TableName, f, value);							//!!!!the name of index file may not be TableName
 
-		if (im.search_one(getDatabaseName(), TableName, inform) >= 0)
-			throw logic_error("break uniqueness");
+		if (im.search_one(getDatabaseName(), IndexFileName, inform) >= 0)
+		{
+			/*throw BreakUniqueness(f.name);*/
+			std::cout << "ERROR: Violation of UNIQUE KEY constraint '" +
+				TableName << "_" << f.name << "'.";
+			std::cout << "The duplicate key value occurs in: "
+				<< "Line number :" << inform.offset << ". The statement has been terminated." << endl;
+			return -1;
+		}
 	}
-
-	//if (hasPrim && im.search_one(getDatabaseName(), TableName, inform) >= 0)	//uniqueness of primary key is kept
-	//{
-		//if some attribute is declared to be unique,
-		//more check should be done
+	//if some attribute is declared to be unique,
+	//more check should be done
 	vector<int> UniqueIndexs = table->getUniqueIndexs();
 	if (UniqueIndexs.size() == 0)
 	{
 		//no need to check unique tuples;
-		rm.Insert(getDatabaseName(), TableName, table, t);
-		InsertSucc = true;
+		return rm.Insert(getDatabaseName(), TableName, table, t);
+		//InsertSucc = true;
 	}
 	else
 	{
@@ -463,16 +679,16 @@ void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
 			if (rm.CheckUnique(getDatabaseName(), TableName, table, conditions))
 			{
 				//can insert
-				rm.Insert(getDatabaseName(), TableName, table, t);
-				InsertSucc = true;
+				return rm.Insert(getDatabaseName(), TableName, table, t);
+				//InsertSucc = true;
+				//return true;
 
 			}
 			else
 			{
 				InsertSucc = false;
 				//error : insertion will break the uniqueness
-				throw logic_error("break uniqueness 464");
-				cout << "The statement has been terminated." << endl;
+				return -1;
 			}
 		}
 		else //no need to iterate by RecordManager, just use IndexManager
@@ -480,10 +696,12 @@ void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
 			bool UniquenessBreak = false;
 			for (int index : UniqueIndexs)
 			{
-				char *value = (char *)(t.getData(index).get());
+				//char *value = (char *)(t.getData(index).get());//????
 				const Field &f = table->getFieldInfoAtIndex(index);
+				char * value = valueStr[index];
 				struct index_info inform(TableName, f, value);				//!!!!the name of index file may not be TableName
-				if (im.search_one(getDatabaseName(), TableName, inform) >= 0)
+				string IndexFileName = TableName + "_" + f.name;
+				if (im.search_one(getDatabaseName(), IndexFileName, inform) >= 0)
 				{
 					//there is a tuple breaks the uniqueness
 					//error : insertion will break the uniqueness
@@ -496,10 +714,14 @@ void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
 					{
 						throw IndexManagerIncompatiblewithRecordManager();
 					}
-					cout << "Cannot insert duplicate key in " << TableName << "." << endl;
-					cout << ". The duplicate key value occurs in :" << endl;
-					cout << selector.next() << endl;
-					cout << ".The statement has been terminated." << endl;
+					std::cout << "ERROR: Violation of UNIQUE KEY constraint '" +
+						TableName << "_" << f.name << "'.";
+					std::cout << "The duplicate key value occurs in: "
+						<< selector.next() << ". The statement has been terminated." << endl;
+					/*std::cout << "Cannot insert duplicate key in " << TableName << "." << endl;
+					std::cout << ". The duplicate key value occurs in :" << endl;
+					std::cout << selector.next() << endl;
+					std::cout << ".The statement has been terminated." << endl;*/
 					UniquenessBreak = true;
 					break;
 				}
@@ -507,50 +729,81 @@ void MiniDB::InsertTuple(const string & TableName, const Tuple & t)
 
 			if (!UniquenessBreak)
 			{
-				rm.Insert(getDatabaseName(), TableName, table, t);
-				InsertSucc = true;
+				return rm.Insert(getDatabaseName(), TableName, table, t);
+				//InsertSucc = true;
+				//return true;
 			}
+			else
+				return -1;
 		}
 
 	}
 
-	if (InsertSucc)//if insertion succeed, update index files
-	{
-		const vector<int>& TupleWithIndex = table->getTupleWithIndexs();
-		for (int index : TupleWithIndex)
-		{
-			char *value = (char *)(t.getData(index).get());
-			const Field &f = table->getFieldInfoAtIndex(index);
-			struct index_info inform(TableName, f, value);//!!!!the name of index file may not be TableName
-			im.insert_one(getDatabaseName(), TableName, inform);
-		}
-	}
+	//if (InsertSucc)//if insertion succeed, update index files
+	//{
+	//	const vector<int>& TupleWithIndex = table->getTupleWithIndexs();
+	//	for (int index : TupleWithIndex)
+	//	{
+	//		string valuestr = (char *)t.getData(index)->getValue();
+	//		char *value = (char *)(t.getData(index).get());
+	//		const Field &f = table->getFieldInfoAtIndex(index);
+	//		struct index_info inform(TableName, f, value);//!!!!the name of index file may not be TableName
+	//		
+	//		inform.offset = 
+	//		im.insert_one(getDatabaseName(), TableName, inform);
+	//	}
+	//}
 }
 
-void MiniDB::Insert(const sql_node & node)
+bool MiniDB::Insert(const sql_node & node)
 {
 	string TableName = node.m_fa[0];
 	Table* table = cm.getTableInfo(TableName);
 	if (table == NULL)
 	{
-		cout << "Can't find this table" << endl;
+		std::cout << "ERROR: Table does not exist." << endl;
+		return false;
 	}
 	else
 	{
 		//construct tuple
 		//vector<Data*> datas;
 		vector<shared_ptr<Data>> datas;
-		for (int i = 0; i < node.m_sa_len; i++)
+		if (node.m_sa_len != table->fields.size())
+		{
+			std::cout << "ERROR: Column name or number of supplied values does not match table definition." << endl;
+			//std::cout << "Tuple:" << t << endl;
+			//std::cout << "Table:" << *table << endl;
+			return false;
+		}
+		for (unsigned i = 0; i < node.m_sa_len; i++)
 		{
 			const Field &f = table->getFieldInfoAtIndex(i);
 			const char* value = node.m_sa[i];
 			//Data *data;
 			shared_ptr<Data> data;
+			stringstream ss;
+			string input = value;
+			int dataType = GetDataTypeFromStr(input);
+			if (dataType == -1)
+			{
+				std::cout << "Syntax error near '" << input  << "' "<< endl;
+				std::cout << " The statement has been terminated." << endl;
+				return false;
+			}
+			if (!(dataType == DataType::INT && f.type == DataType::FLOAT) && dataType != f.type)
+			{
+				/*throw InvalidInputForConstructData();
+				return false;*/
+				std::cout << "ERROR: Column type of supplied values does not match table definition." << endl;
+				return false;
+			}
 			switch (f.type)
 			{
 			case DataType::INT: {
-				int IntValue = atoi(value);
+				//int IntValue = atoi(value);
 				//data = new Int(IntValue);
+				int IntValue = atoi(value);
 				data = make_shared<Int>(IntValue);
 				break;
 			}
@@ -564,7 +817,7 @@ void MiniDB::Insert(const sql_node & node)
 				// drop the '' of string
 				str.pop_back();
 				int sz = str.size();
-				data = make_shared<Char>(str.substr(1, sz-1));
+				data = make_shared<Char>(str.substr(1, sz - 1));
 				break;
 			}
 			}
@@ -573,90 +826,183 @@ void MiniDB::Insert(const sql_node & node)
 		Tuple t(datas);
 		if (!checkTupleFormat(table, t))
 		{
-			cout << "The format of tuple is inconsistent with table" << endl;
-			cout << "Tuple:" << t << endl;
-			cout << "Table:" << *table << endl;
+			std::cout << "ERROR: Column type of supplied values does not match table definition." << endl;
+			return false;
 		}
 		else
 		{
-			InsertTuple(TableName, t);
+			//Insert succeed and then updata indexmanager
+			int lineNum = InsertTuple(TableName, t, node.m_sa, node.m_sa_len);
+			if (lineNum >= 0)
+			{
+				vector<int> TupleWithIndex = table->getTupleWithIndexs();
+				for (int ti : TupleWithIndex)
+				{
+					const Field &f = table->getFieldInfoAtIndex(ti);
+					struct index_info inform(TableName, f, node.m_sa[ti]);
+					inform.offset = lineNum;
+					std::cout << "REPORT: Command completed successfully." << endl;
+					//cout << "Insert Index on " << t << " : " << f.name << endl;
+					string IndexFileName = TableName + "_" + f.name;
+					blockInfo *info = readBlock(TableName, 0, DataFile);
+					/*ofstream fout;
+					fout.open("Log.bin", ios::binary | ios::out);
+					fout.write(info->cBlock, 4096);
+					fout.close();*/
+					im.insert_one(getDatabaseName(), IndexFileName, inform); //!!
+	/*				fout.open("Log.bin", ios::binary | ios::out);
+					fout.write(info->cBlock, 4096);
+					fout.close();*/
+				}
+			}
+			else
+			{
+				return false;
+			}
+
 		}
 	}
-
+	return true;
 }
 
-void MiniDB::Select(const sql_node &node)
+
+int MiniDB::GetDataTypeFromStr(string input)
 {
+	try
+	{
+		if (input.front() == '\'' && input.back() == '\'') //string
+		{
+			string cut = input.substr(1, input.size() - 2);
+			return DataType::CHAR;
+		}
+		else if ((input.find('.') != string::npos) && (input.find_first_of('.') == input.find_last_of('.')))//float
+		{
+			float value = stof(input);
+			return DataType::FLOAT;
+		}
+		else //int
+		{
+			int value = stoi(input);
+			return DataType::INT;
+		}
+	}
+	catch (const exception& e)
+	{
+		return -1;
+		//throw InvalidInputForConstructData();
+	}
+}
+
+bool MiniDB::Select(const sql_node &node)
+{
+	vector<string> Attrs;
+	//####
+	for (unsigned i = 0; i < node.m_fa_len; i++)
+	{
+		if (strcmp(node.m_fa[0], "*") == 0)
+			break;
+		string AttrName = node.m_fa[i];
+		Attrs.push_back(AttrName);
+	}
+
 	string TableName = node.m_sa[0];
 	Table* table = cm.getTableInfo(TableName);
-	Selector selector;
-	if (node.m_type == SELECT_WHERE)
+	if (table == NULL)
 	{
-		//construct conds and LineNums
-		vector<Condition> conds;
-		LinkOp lop;
-		getCondsAndLinkOp(node.m_sa, node.m_sa_len, node.m_func, table, conds, lop);
-		const vector<int> &LineNums = getLineNumsAndLeftConds(table, conds, lop);
-		selector = Selector(getDatabaseName(), TableName, table, conds, LineNums, lop);
+		std::cout << "ERROR: Table does not exist." << endl;
+		return false;
 	}
-	else //select ordinary
-		selector = Selector(getDatabaseName(), TableName, table);
+	else
+	{
+		Selector selector;
+		if (node.m_type == SELECT_WHERE)
+		{
+			//construct conds and LineNums
+			vector<Condition> conds;
+			vector<string> values;
+			LinkOp lop;
+			getCondsAndLinkOp(node.m_ta, node.m_ta_len, node.m_func, table, conds, lop, values);
+			bool useIndex;
+			const vector<int> &LineNums = getLineNumsAndLeftConds(table, conds, lop, values, useIndex);
+			if (useIndex && LineNums.size() == 0)
+			{
+				std::cout << "REPORT: Command(s) completed successfully." << endl
+					<< setw(8) << "" << "(" << 0 << " row(s) affected.)" << endl;
+				return  true;
+			}
+			if (node.m_ta_len == 2) lop = LinkOp::AND;
+			selector = Selector(getDatabaseName(), TableName, table, conds, LineNums, lop);
+		}
+		else //select ordinary
+			selector = Selector(getDatabaseName(), TableName, table);
 
-	Print(selector, table);
+		if (Attrs.size() == 0)
+		{
+			for (Field f : table->fields)
+				Attrs.push_back(f.name);
+		}
+		if (IsPrint)
+			Print(selector, table, Attrs);
+	}
+	return true;
 }
 
-void MiniDB::Delete(const sql_node & node)
+bool MiniDB::Delete(const sql_node & node)
 {
 	string TableName = node.m_fa[0];
 	const Table* table = cm.getTableInfo(TableName);
-	Deleter deleter;
-	if (node.m_type == DELETE_WHERE)
+	if (table == NULL)
 	{
-		//construct conds and LineNums
-		vector<Condition> conds;
-		LinkOp lop;
-		getCondsAndLinkOp(node.m_sa, node.m_sa_len, node.m_func, table, conds, lop);
-		const vector<int> &LineNums = getLineNumsAndLeftConds(table, conds, lop);
-		deleter = Deleter(getDatabaseName(), TableName, table, conds, LineNums, LinkOp::AND);
+		std::cout << "ERROR: Table does not exist." << endl;
+		return false;
 	}
-	else//delete ordinary
-		deleter = Deleter(getDatabaseName(), TableName, table);
-
-	const vector<int> &TupleWithIndex = table->getTupleWithIndexs();
-	//get every tuple to delete and delete associated index
-	while (deleter.hasNext())
+	else
 	{
-		const Tuple &t = deleter.next();
-		for (int tupleIndex : TupleWithIndex)
+		Deleter deleter;
+		if (node.m_type == DELETE_WHERE)
 		{
-			const Field &f = table->getFieldInfoAtIndex(tupleIndex);
-			struct index_info inform(TableName, f, (char *)(t.getData(tupleIndex)).get());
-			im.delete_one(getDatabaseName(), TableName, inform);
+			//construct conds and LineNums
+			vector<Condition> conds;
+			LinkOp lop;
+			vector<string> values;
+			getCondsAndLinkOp(node.m_sa, node.m_sa_len, node.m_func, table, conds, lop, values);
+			bool useIndex;
+			const vector<int> &LineNums = getLineNumsAndLeftConds(table, conds, lop, values, useIndex);
+			if (useIndex && LineNums.size() == 0)
+			{
+				if (IsPrint)
+					std::cout << "REPORT: Command(s) completed successfully." << endl
+					<< setw(8) << "" << "(" << 0 << " row(s) affected.)" << endl;
+				return  true;
+			}
+			deleter = Deleter(getDatabaseName(), TableName, table, conds, LineNums, LinkOp::AND);
+		}
+		else//delete ordinary
+			deleter = Deleter(getDatabaseName(), TableName, table);
+
+		const vector<int> &TupleWithIndex = table->getTupleWithIndexs();
+		//get every tuple to delete and delete associated index
+		while (deleter.hasNext())
+		{
+			const Tuple &t = deleter.next();
+			for (int tupleIndex : TupleWithIndex)
+			{
+				const Field &f = table->getFieldInfoAtIndex(tupleIndex);
+				string value = t.getValueStr(tupleIndex);
+				struct index_info inform(TableName, f, value.data()); //!!!
+				string IndexFileName = TableName + "_" + f.name;
+				im.delete_one(getDatabaseName(), IndexFileName, inform);
+			}
 		}
 	}
-}
-
-void MiniDB::DeleteAll(string TableName)
-{
-	const Table* table = cm.getTableInfo(TableName);
-	Deleter deleter(getDatabaseName(), TableName, table);
-	const vector<int> &TupleWithIndex = table->getTupleWithIndexs();
-	//get every tuple to delete and delete associated index
-	while (deleter.hasNext())
-	{
-		const Tuple &t = deleter.next();
-		for (int tupleIndex : TupleWithIndex)
-		{
-			const Field &f = table->getFieldInfoAtIndex(tupleIndex);
-			struct index_info inform(TableName, f, (char *)(t.getData(tupleIndex).get()));
-			im.delete_one(getDatabaseName(), TableName, inform);
-		}
-	}
+	return true;
 }
 
 bool MiniDB::checkTupleFormat(const Table * table, const Tuple & t)
 {
-	for (int i = 0; i < table->fields.size(); i++)
+	if (table->fields.size() != t.datas.size())
+		return false;
+	for (unsigned i = 0; i < table->fields.size(); i++)
 	{
 		if (table->fields[i].type != (t.datas[i])->getType())
 		{

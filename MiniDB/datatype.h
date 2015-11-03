@@ -69,7 +69,7 @@ struct index_info {
 
 	//10.27 add by hedejin
 	index_info(){}
-	index_info(const string& name,const Field& f, char *_value) {
+	index_info(const string& name,const Field& f, const char *_value) {
 		index_name = name + "_" + f.name;
 		length = f.length;
 		type = f.type;

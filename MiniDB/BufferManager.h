@@ -38,7 +38,7 @@ string get_file_path(string table_name, int file_type);
 string get_directory_path(string databaseName);
 void replace(fileInfo *m_fileInfo, blockInfo *m_blockInfo);
 blockInfo *get_file_block(string Table_Name, int fileType, int blockNum);
-void closeDatabase(string DB_Name, bool m_flag);
+void closeDatabase();
 void closeFile(size_t num);
 void writeBlock(size_t m_file_num, blockInfo *block);
 fileInfo *get_file_info(string fileName, int m_fileType);

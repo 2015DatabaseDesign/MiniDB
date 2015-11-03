@@ -383,10 +383,10 @@ blockInfo *get_file_block(string fileName, int fileType, int blockNum) {
 	/* File Not in Buffer */
 	if (new_block == NULL) {
 		new_file = get_file_info(fileName, fileType);
-		//show(new_file);
-		file_read = file_in[new_file - FileHandle];
-		new_block = findBlock();
-		replace(new_file, new_block);
+//show(new_file);
+file_read = file_in[new_file - FileHandle];
+new_block = findBlock();
+replace(new_file, new_block);
 	}
 	/************************************************************************/
 	/* Read Block Data From File                                            */
@@ -425,12 +425,43 @@ blockInfo *get_new_block(const string& file_name, int fileType, int blockNum) {
 	return new_block;
 }
 void closeDatabase() {
-	for (size_t i = 0; i < 5; i++)
+	for (size_t i = 0; i < 5; i++) {
+		if (FILE_NUM == 0)
+			return;
 		closeFile(i);
+	}
 }
-
+//void closeFile(string fileName, int fileType) {
+//	fileInfo *filenode = FileHandle;
+//	while (filenode) {
+//		if (filenode->fileName == fileName && filenode->type == fileType)
+//			break;
+//		filenode = filenode->next;
+//	}
+//	if (!filenode)
+//		return;
+//	blockInfo *blocknode = filenode->firstBlock;
+//	size_t m_file_num = filenode - FileHandle;
+//	while (blocknode) {
+//		if (blocknode->dirtyBit)
+//			/************************************************************************/
+//			/* dirty bit                                                            */
+//			/************************************************************************/
+//			writeBlock(m_file_num, blocknode);
+//
+//		blocknode->file = NULL;
+//		blocknode = blocknode->next;
+//
+//	}
+//	fclose(file_in[m_file_num]);
+//	FILE_NUM--;
+//	filenode->fileName = "";
+//	filenode->firstBlock = NULL;
+//}
 void closeFile(size_t m_file_num) {
 	fileInfo *filenode = FileHandle + m_file_num;
+	if (filenode->fileName == "")
+		return;
 	//if (filenode->fileName != m_fileName || filenode->type != m_fileType)
 	//	/************************************************************************/
 	//	/* ERROR                                                                */
@@ -443,11 +474,14 @@ void closeFile(size_t m_file_num) {
 			/* dirty bit                                                            */
 			/************************************************************************/
 			writeBlock(m_file_num, blocknode);
-		
+
 		blocknode->file = NULL;
 		blocknode = blocknode->next;
+
 	}
 	fclose(file_in[m_file_num]);
+	file_in[m_file_num] = NULL;
+	FILE_NUM--;
 	filenode->fileName = "";
 	filenode->firstBlock = NULL;
 }
@@ -461,6 +495,7 @@ void writeBlock(size_t m_file_num, blockInfo *block) {
 		cout << "write back, write error" << endl;
 		exit(1);
 	}
+	block->dirtyBit = 0;
 }
 
 fileInfo *get_file_info(string fileName, int m_fileType) {
@@ -479,7 +514,12 @@ fileInfo *get_file_info(string fileName, int m_fileType) {
 		file_out_num = (file_out_num == MAX_FILE_ACTIVE - 1) ? 0 : file_out_num++;
 	}
 	int file_num = node - FileHandle;
-	file_in[file_num] = fopen(get_file_path(fileName, m_fileType).data(), "wb+");
+	if ((file_in[file_num] = fopen(get_file_path(fileName, m_fileType).data(), "rb+")) == NULL)
+	{
+		cout << "FILE NOT EXISTS, Program terminated!" << endl;
+		getchar();
+		exit(0);
+	}
 	node->fileName = string(fileName);
 	node->type = m_fileType;
 	node->firstBlock = NULL;
@@ -550,7 +590,18 @@ size_t create_file(string fileName, int fileType) {
 size_t delete_file(string fileName, int fileType) {
 	string path = get_file_path(fileName, fileType);
 	//string command = "rm " + path;
+	int m_file_num = -1; /* Any number not between 0 and 4*/
+	for (int i = 0; i < MAX_FILE_ACTIVE; i++) {
+		if ((FileHandle + i)->fileName == fileName && (FileHandle + i)->type == fileType)
+			if (file_in[i] != NULL) {
+				m_file_num = i;
+				break;
+			}
+	}
+
 	if (_access(path.data(), 0) == 0) {
+		if (m_file_num >= 0)
+			closeFile(m_file_num);
 		if (remove(path.data()) == 0)
 			return 1;
 		cout << "Error in DELETE FILE!" << endl;
