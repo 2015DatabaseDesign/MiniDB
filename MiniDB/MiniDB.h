@@ -13,9 +13,9 @@ private:
 	CatalogManager cm;			
 	RecordManager rm;
 	DB_interpreter ip;
-	bool IsPrint;
 
 	void Print(Selector& selector, const Table* tableDesc, const vector<string>& Attrs);
+	void Print(const map<int, Tuple> tuples, const Table * tableDesc, const vector<string>& AttrsName);
 	void getCondsAndLinkOp(char ** input, int size, byte func, const Table * table, vector<Condition>& conds, LinkOp & lop, vector<string>& values);
 	Data * getDataFromStr(string input);
 	Op getOpFromFunc(int input);
@@ -24,7 +24,6 @@ private:
 public:
 	MiniDB() {
 		mem_init();
-		IsPrint = true;
 	}
 	bool getOperation(const sql_node& node);
 	void readinput();

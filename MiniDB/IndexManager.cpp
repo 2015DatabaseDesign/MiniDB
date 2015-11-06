@@ -26,7 +26,7 @@ int AnyCmp(const string& s, const string& t, int type) {
 	else if (type == Char_n)
 		return StrCmp(s, t);
 }
-
+ 
 int IndexManager::search_leaf(const string& database, const string& table_name, const index_info& inform) {
 	blockInfo *root = get_my_file_block(database, table_name, IndexFile, 0);
 	blockInfo *node = get_my_file_block(database, table_name, IndexFile, root->blockNum);
@@ -115,7 +115,6 @@ int IndexManager::search_one(const string& database, const string& table_name, s
 	inform.offset = 0;
 	return -8;
 }
-
 int IndexManager::findNextLeafSibling(const string& database, const string& table_name, int blocknum) {
 	blockInfo *node = get_my_file_block(database, table_name, IndexFile, blocknum);
 	if (node->charNum == 0)
@@ -125,7 +124,6 @@ int IndexManager::findNextLeafSibling(const string& database, const string& tabl
 		return 0;
 	return StrToI(info.substr(node->charNum - 3, 3));
 }
-
 int IndexManager::findLeftMostSibling(const string& database, const string& table_name) {
 	blockInfo *node = get_my_file_block(database, table_name, IndexFile, 0);
 	if (node->charNum == 0)
@@ -158,6 +156,57 @@ int IndexManager::findPrevLeafSibling(const string& database, const string& tabl
 	return left;
 }
 
+//int IndexManager::findParent(const std::string& database, const std::string& table_name, const index_info& inform, int blocknum) {
+//	blockInfo *node = get_my_file_block(database, table_name, IndexFile, blocknum);
+//	if (node->charNum == 0)
+//		return -3;
+//	int length, parent;
+//	if (inform.type == Int)
+//		length = IntLen;
+//	else if (inform.type == Float)
+//		length = FloatLen;
+//	else if (inform.type == Char_n)
+//		length = StrLen;
+//	string info = node->cBlock;
+//	string value;
+//	if (info[0] == '?')
+//		value = info.substr(1 + ValueLen + ChildLen, length);
+//	else if (info[0] == '!')
+//		value = info.substr(1 + ValueLen + LeafLen, length);
+//	blockInfo *root = get_my_file_block(database, table_name, IndexFile, 0);
+//	if (root->blockNum == blocknum)
+//		return -1; // already root
+//	int start;
+//	info = root->cBlock;
+//	while (root->blockNum != blocknum) {
+//		int count = StrToI(info.substr(1, ValueLen));
+//		int end;
+//		int blockNum;
+//		for (int i = 0; i <count; i++) {
+//			start = (length + ChildLen)*i + (1 + ValueLen + ChildLen);
+//			end = start + length - 1;
+//			int compare = AnyCmp(inform.value, info.substr(start, length), inform.type);
+//			if (compare >= 0) {
+//				if (end + ChildLen == node->charNum - 1) {
+//					blockNum = StrToI(info.substr(end + 1, ChildLen));
+//					break; // hit last pointer;
+//				}
+//				else
+//					continue;
+//			}
+//			else {
+//				blockNum = StrToI(info.substr(start - ChildLen, ChildLen));
+//				break;
+//			}
+//		}
+//		parent = root->blockNum;
+//		root = get_my_file_block(database, table_name, IndexFile, blockNum);
+//		info = root->cBlock;
+//	}
+//	return parent;
+//}
+
+
 int IndexManager::findParent(const std::string& database, const std::string& table_name, const index_info& inform, int blocknum) {
 	blockInfo *node = get_my_file_block(database, table_name, IndexFile, blocknum);
 	if (node->charNum == 0)
@@ -187,9 +236,9 @@ int IndexManager::findParent(const std::string& database, const std::string& tab
 		for (int i = 0; i <count; i++) {
 			start = (length + ChildLen)*i + (1 + ValueLen + ChildLen);
 			end = start + length - 1;
-			int compare = AnyCmp(inform.value, info.substr(start, length), inform.type);
+			int compare = AnyCmp(value, info.substr(start, length), inform.type);
 			if (compare >= 0) {
-				if (end + ChildLen == node->charNum - 1) {
+				if (end + ChildLen == root->charNum - 1) {
 					blockNum = StrToI(info.substr(end + 1, ChildLen));
 					break; // hit last pointer;
 				}
@@ -445,7 +494,7 @@ void IndexManager::delete_one(const string& database, const string& table_name, 
 	delete_entry(database, table_name, inform, L, inform.value, L);
 }
 
-// n: the node to be checked, K: key, nod: the child of n
+// n: the node to be checked, K: key, nod: the child of n, nod is to be deleted
 void IndexManager::delete_entry(const string& database, const string& table_name, struct index_info& inform, int n, const string& K, int nod) {
 	int length;
 	if (inform.type == Int) {
@@ -471,7 +520,7 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 	for (int i = 0; i < num; i++) {
 		int compare;
 		if (tmpN[0] == '?')
-			start = (length + ChildLen)*i + ValueLen + ChildLen +  1;
+			start = (length + ChildLen)*i + ValueLen + ChildLen + 1;
 		else if (tmpN[0] == '!')
 			start = (length + LeafLen)*i + ValueLen + LeafLen + 1;
 		compare = AnyCmp(K, info.substr(start, length), inform.type);
@@ -481,7 +530,7 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 					tmpN.replace(start - 3, length + 3, "");
 					break;
 				}
-				else if (tmpN.substr(start, length + 3) == IToStr(nod, 3)) { // parent
+				else if (tmpN.substr(start + length, 3) == IToStr(nod, 3)) { // parent
 					tmpN.replace(start, length + 3, "");
 					break;
 				}
@@ -495,14 +544,24 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 	int parent = findParent(database, table_name, inform, Node->blockNum);
 	write(Node, tmpN);
 	if (Node->blockNum == 0 && originN.substr(1, 4) == "0001") { // root has only one child 
-		if (tmpN[0] == '?') // it is already leaf node, no children at all
+		if (tmpN[0] == '!') // it is already leaf node, no children at all
 			return;
 		// make the child of Node as the root node
 		blockInfo *child = get_my_file_block(database, table_name, IndexFile, StrToI(originN.substr(5, 3)));
+		if (child->blockNum == nod)
+			child = get_my_file_block(database, table_name, IndexFile, StrToI(originN.substr(13, 3)));
+		//        char *tmp = child->cBlock;
+		//        child->cBlock = Node->cBlock;
+		//        Node->cBlock = tmp;
 		Node->blockNum = child->blockNum;
 		child->blockNum = 0;
 		writeRootBlock(database, table_name, child);
 		deleteBlock(database, table_name, Node);
+		//        deleteBlock(database, table_name, child);
+		return;
+	}
+	if (Node->blockNum == 0) {  // root, and has at least two children, break directly
+		return;
 	}
 	else {
 		info = Node->cBlock;
@@ -510,8 +569,13 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 		if (info[0] == '!') { // leafnode
 			if (StrToI(info.substr(1, 4)) < LeafLeast) {
 				int n1 = findPrevLeafSibling(database, table_name, n);
-				blockInfo *N1 = get_my_file_block(database, table_name, IndexFile, n1);
-				int parent1 = findParent(database, table_name, inform, N1->blockNum);
+				blockInfo *N1 = NULL;
+				int parent1;
+				if (n1 >= 0) {
+					N1 = get_my_file_block(database, table_name, IndexFile, n1);
+					parent1 = findParent(database, table_name, inform, N1->blockNum);
+				}
+				else parent1 = -1;
 				if (parent == parent1) {
 					string K1 = originN.substr(1 + ValueLen + LeafLen, length);
 					string tmpN1 = N1->cBlock;
@@ -525,9 +589,9 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 					}
 					else { // move last elem. in prev. as first in node
 						int numN1 = StrToI(tmpN1.substr(1, 4));
-						string last = tmpN1.substr(5 + (length + LeafLen)*(numN1 - 1), length);
+						string last = tmpN1.substr(5 + (length + LeafLen)*(numN1 - 1), LeafLen + length);
 						tmpN1.replace(1, 4, IToStr(StrToI(tmpN1.substr(1, 4)) - 1, 4));
-						tmpN1.replace(5 + (length + LeafLen)*(numN1 - 1), length, "");
+						tmpN1.replace(5 + (length + LeafLen)*(numN1 - 1), LeafLen + length, "");
 						write(N1, tmpN1);
 						tmpN.replace(1, 4, IToStr(StrToI(tmpN.substr(1, 4)) + 1, 4));
 						tmpN.insert(5, last);
@@ -546,7 +610,7 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 						}
 					}
 				}
-				else { // same as before, mutual parent;
+				else { // next child of N1's parent
 					n1 = findNextLeafSibling(database, table_name, n);
 					blockInfo *N1 = get_my_file_block(database, table_name, IndexFile, n1);
 					string tmpN1 = N1->cBlock;
@@ -554,15 +618,15 @@ void IndexManager::delete_entry(const string& database, const string& table_name
 					if (StrToI(tmpN.substr(1, 4)) + StrToI(tmpN1.substr(1, 4)) <= N - 1) { // merge
 						tmpN1.replace(1, 4, IToStr(StrToI(info.substr(1, 4)) + StrToI(tmpN1.substr(1, 4)), 4));
 						tmpN.replace(tmpN.size() - 3, 3, "");
-						tmpN1.insert(5, tmpN.substr(5, Node->charNum - 5));
+						tmpN1.insert(5, tmpN.substr(5, tmpN.size() - 5));
 						write(N1, tmpN1);
 						delete_entry(database, table_name, inform, parent, K1, n);
 						deleteBlock(database, table_name, Node);
 					}
 					else { // move first elem. in next. as last in node
-						string first = tmpN1.substr(1 + ValueLen + LeafLen, length);
+						string first = tmpN1.substr(1 + ValueLen, LeafLen + length);
 						tmpN1.replace(1, 4, IToStr(StrToI(tmpN1.substr(1, 4)) - 1, 4));
-						tmpN1.replace(5, length + LeafLen, "");
+						tmpN1.replace(1 + ValueLen, length + LeafLen, "");
 						write(N1, tmpN1);
 						tmpN.replace(1, 4, IToStr(StrToI(tmpN.substr(1, 4)) + 1, 4));
 						tmpN.insert(tmpN.size() - 3, first);
@@ -705,19 +769,15 @@ void IndexManager::insert_one(const std::string& database, const std::string& ta
 		int l1 = L1->blockNum;
 		blockInfo *T = get_my_new_block(database, table_name, l1);////////
 		int t = T->blockNum; // tmp backup of leaf node;///////
-		T->cBlock = (char *)info.c_str();//////
+		strcpy(T->cBlock, info.c_str());//////
 		string pn;
 		if (info[node->charNum - 1] == '#')
 			pn = info.substr(node->charNum - 1, 1);
 		else
 			pn = info.substr(node->charNum - ChildLen, ChildLen);
-		try {
+
 		insert_leaf(database, table_name, inform, t);/////
 
-		}
-		catch (const exception &e) {
-			cout << e.what() << endl;
-		}
 		string tmpT = T->cBlock;
 		int half = ceil((StrToI(info.substr(1, ValueLen)) + 1) / 2.0);
 		string tmpL = "!" + IToStr(half, ValueLen);
@@ -763,7 +823,7 @@ void IndexManager::insert_leaf(const string& database, const string& table_name,
 			return;
 		}
 	}
-		// insert in the last
+	// insert in the last
 	if (tmp[tmp.size() - 1] == '#')
 		tmp.insert(tmp.size() - 1, insert);
 	else
@@ -772,7 +832,76 @@ void IndexManager::insert_leaf(const string& database, const string& table_name,
 	return;
 }
 
-// Node: the node to be inserted, K1: key, N1: sibling of Node
+//// Node: the node to be inserted, K1: key, N1: sibling of Node
+//void IndexManager::insert_parent(const std::string& database, const std::string& table_name, struct index_info& inform, int Node, const string& K1, int N1) {
+//	blockInfo *root = get_my_file_block(database, table_name, IndexFile, 0);
+//	int length;
+//	if (inform.type == Int)
+//		length = IntLen;
+//	else if (inform.type == Float)
+//		length = FloatLen;
+//	else if (inform.type == Char_n)
+//		length = StrLen;
+//	if (root->blockNum == Node) { // Node == 0
+//		blockInfo *R = get_my_new_block(database, table_name, -1);
+//		int r = R->blockNum;
+//		string info = "?0001" + IToStr(r, ChildLen) + K1 + IToStr(N1, ChildLen);
+//		R->blockNum = Node;
+//		root->blockNum = r;
+//		write(R, info);
+//		writeRootBlock(database, table_name, R);
+//		return;
+//	}
+//	blockInfo *N0 = get_my_file_block(database, table_name, IndexFile, Node);
+//	int p = findParent(database, table_name, inform, N0->blockNum);
+//	blockInfo *P = get_my_file_block(database, table_name, IndexFile, p);
+//	string info = P->cBlock;
+//	if (StrToI(info.substr(1, 4)) < N - 1) {
+//		string tmp = P->cBlock;
+//		int count = StrToI(tmp.substr(1, ValueLen));
+//		int start;
+//		tmp.replace(1, ValueLen, IToStr(count + 1, ValueLen));
+//		for (int i = 0; i <= count; i++) {
+//			start = (length + ChildLen)*i + 1 + ValueLen;
+//			if (tmp.substr(start, ChildLen) == IToStr(Node, ChildLen)) {
+//				tmp.insert(start + ChildLen, K1 + IToStr(N1, ChildLen));
+//				return;
+//			}
+//		}
+//	}
+//	else { // divide P;
+//		blockInfo *P1 = get_my_new_block(database, table_name, -1);
+//		int p1 = P1->blockNum;
+//		blockInfo *T = get_my_new_block(database, table_name, p1);
+//		T->cBlock = P->cBlock;
+//		string tmpT = T->cBlock;
+//		int count = StrToI(tmpT.substr(1, ValueLen));
+//		int start;
+//		tmpT.replace(1, ValueLen, IToStr(count + 1, ValueLen));
+//		for (int i = 0; i < count; i++) {
+//			start = (length + ChildLen)*i + 1 + ValueLen;
+//			if (tmpT.substr(start, ChildLen) == IToStr(Node, ChildLen)) {
+//				tmpT.insert(start + ChildLen, K1 + IToStr(N1, ChildLen));
+//				break;
+//			}
+//		}
+//		// blockInfo *P1 = get_my_new_block(database, table_name);
+//		// int p1 = P1->blockNum;
+//		int half = ceil(count / 2.0);
+//		string tmpP = "?" + IToStr(half, ValueLen);
+//		tmpP += tmpT.substr(5, (length + ChildLen)*half + ChildLen);
+//		write(P, tmpP);
+//		// remaining half, move K11 up to parent
+//		string K11 = tmpT.substr(5 + (length + ChildLen)*half + ChildLen, length);
+//		string tmpP1 = "?" + IToStr(count - half, ValueLen);
+//		tmpP1 += tmpT.substr(5 + (length + ChildLen)*(half + 1), (length + ChildLen)*(count - half) + ChildLen);
+//		write(P1, tmpP1);
+//		insert_parent(database, table_name, inform, p, K11, p1);
+//		deleteBlock(database, table_name, T);
+//	}
+//}
+
+// Node -> Node + N1 (K1 is the smallest key in N1);
 void IndexManager::insert_parent(const std::string& database, const std::string& table_name, struct index_info& inform, int Node, const string& K1, int N1) {
 	blockInfo *root = get_my_file_block(database, table_name, IndexFile, 0);
 	int length;
@@ -805,6 +934,7 @@ void IndexManager::insert_parent(const std::string& database, const std::string&
 			start = (length + ChildLen)*i + 1 + ValueLen;
 			if (tmp.substr(start, ChildLen) == IToStr(Node, ChildLen)) {
 				tmp.insert(start + ChildLen, K1 + IToStr(N1, ChildLen));
+				write(P, tmp);
 				return;
 			}
 		}
@@ -842,6 +972,17 @@ void IndexManager::insert_parent(const std::string& database, const std::string&
 }
 
 
+//void IndexManager::write(blockInfo *const node, const string& s) {
+//	// if (node->cBlock)
+//	//     delete[] node->cBlock;
+//	memset(node->cBlock, 0, 4096);
+//	// node->cBlock = new char[4000];
+//
+//	strcpy(node->cBlock, s.c_str());
+//	node->charNum = strlen(node->cBlock);
+//	node->dirtyBit = true;
+//}
+
 void IndexManager::write(blockInfo *const node, const string& s) {
 	// if (node->cBlock)
 	//     delete[] node->cBlock;
@@ -852,8 +993,6 @@ void IndexManager::write(blockInfo *const node, const string& s) {
 	node->charNum = strlen(node->cBlock);
 	node->dirtyBit = true;
 }
-
-
 
 
 

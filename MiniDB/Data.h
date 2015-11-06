@@ -27,14 +27,11 @@ class Data {
 private:
 	unsigned type;
 	unsigned length;
-	//string name;
 public:
 	Data(unsigned _type, unsigned _length);
-	//string getName();
 	virtual ~Data();
 	int getType() const;
 	unsigned getLength() const;
-	//add by hedejin 10/28
 	virtual bool compare(Op op, const Data* data);
 	virtual void* getValue() const = 0;
 

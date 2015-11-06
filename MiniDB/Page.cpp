@@ -1,4 +1,5 @@
 #include "Page.h"
+#include "RecordManager.h"
 #include <sstream>
 
 string Tuple::toString()const
@@ -231,7 +232,7 @@ bool Page::isTupleValid(int index)
 {
 	if (index < TupleNum)
 	{
-		char isValid = data[index];
+		char isValid = data[index] & 0x1;
 		return isValid > 0;
 	}
 	else
@@ -242,13 +243,13 @@ bool Page::isTupleValid(int index)
 
 int Page::InsertableIndex()
 {
-	for (int i = 0; i < TupleNum; i++)
-	{
-		char isValid = data[i];
-		if (isValid == 0)
-			return i;
+	for (int i = 0; i < TupleNum; i += JUMPLENGTH) {
+		if ((data[i] & 0xFE) == 0)
+			continue;
+		for (int j = 0; j < JUMPLENGTH && (i + j) < TupleNum; j++)
+			if ((data[i + j] & 0x1) == 0)
+				return (i + j);
 	}
-
 	return -1;
 }
 
@@ -282,30 +283,59 @@ Tuple Page::ReadTuple(int index)
 	return tuple;
 }
 
-void Page::SetHeader(int index, bool isSet)
+void Page::SetHeader(int index, unsigned char isSet)
 {
 	if (index >= TupleNum)
-	{
 		throw TupleIndexOutofRange(index);
-	}
-	if (isSet)
-	{
-		if (this->data[index] == 1)
-		{
-			//error:This tuple is already written
-			throw TupleAlreadyWrittenButInsertOnIt(index);
-		}
-		else
-			this->data[index] = (unsigned char)1;
-	}
-	else
-	{
-		if (this->data[index] == 0)
-		{
-			//error:This tuple is already deleted
+	switch (isSet) {
+	case 0:
+		if ((this->data[index] & 0x1) == 0) //error:This tuple is already deleted
 			throw TupleAlreadyDeletedButDeleteItAgain(index);
-		}
 		else
-			this->data[index] = (unsigned char)0;
+			this->data[index] &= 0xFE; // reset 0
+		break;
+	case 1:
+		if ((this->data[index] & 0x1) == 1) //error:This tuple is already written
+			throw TupleAlreadyWrittenButInsertOnIt(index);
+		else
+			this->data[index] |= 0x1; // set 1
+		break;
+	case 2:
+		if ((this->data[index] >> 1) < JUMPLENGTH)
+			this->data[index] += 2;
+		break;
+	case 3:
+		if ((this->data[index] >> 1) > 0)
+			this->data[index] -= 2;
+		break;
+	case 4:
+		this->data[index] = ((unsigned char)JUMPLENGTH) << 1;
+		break;
+	default:
+		break;
 	}
+	//if (index >= TupleNum)
+	//{
+	//	throw TupleIndexOutofRange(index);
+	//}
+	//if (isSet)
+	//{
+	//	if (this->data[index] == 1)
+	//	{
+	//		//error:This tuple is already written
+	//		throw TupleAlreadyWrittenButInsertOnIt(index);
+	//	}
+	//	else
+	//		this->data[index] = (unsigned char)1;
+	//}
+	//else
+	//{
+	//	if (this->data[index] == 0)
+	//	{
+	//		//error:This tuple is already deleted
+	//		throw TupleAlreadyDeletedButDeleteItAgain(index);
+	//	}
+	//	else
+	//		this->data[index] = (unsigned char)0;
+	//}
 }

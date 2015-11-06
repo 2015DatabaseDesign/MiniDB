@@ -17,6 +17,9 @@ bool MatchMultiCond(vector<Condition> conds, const Tuple&t, LinkOp lop)
 	}
 	else //lop == LinkOp :: OR
 	{
+		//add by hedejin 11/4
+		if (conds.size() == 0)
+			return true;
 		bool someMatch = false;
 		for (Condition c : conds)
 		{
@@ -41,7 +44,7 @@ bool Selector::hasNext()
 	if (LineNums.size() == 0) 
 	{
 		//if (useIndex)
-		//	return false;//Index has no result
+		//	return false;//Index has no reclt
 		
 		//no given line numbers, simply iterate tuples
 		while (true)
@@ -168,6 +171,7 @@ bool Deleter::hasNext()
 						nextTuple = t;
 						CurrentIndex = nextIndex;
 						page.SetHeader(i, false); //lazy deletion
+						page.SetHeader(i - (i % JUMPLENGTH), 2);//mark
 						CurrentBlock->dirtyBit = true;//set it dirty
 						return true;
 					}
@@ -208,6 +212,7 @@ bool Deleter::hasNext()
 				CurrentIndex = LineNum;
 				givenLineNumIndex = nextIndex;
 				page.SetHeader(LineNumInPage, false); //Lazy deletion
+				page.SetHeader(LineNumInPage - LineNumInPage % JUMPLENGTH, 2);
 				CurrentBlock->dirtyBit = true;
 				return true;
 			}
@@ -309,7 +314,7 @@ int RecordManager::Insert(const string& DBName, const string& TableName, Table* 
 		{
 			for (int i = 0; i < page.getTupleNum(); i++)
 			{
-				page.SetHeader(i, false);
+				page.SetHeader(i, 4);
 			}
 		}
 		
@@ -318,8 +323,9 @@ int RecordManager::Insert(const string& DBName, const string& TableName, Table* 
 		{
 			page.WriteTuple(t, index);
 
-			page.SetHeader(index, true);
-
+			/*page.SetHeader(index, true);*/
+			page.SetHeader(index, 1);
+			page.SetHeader(index - index % JUMPLENGTH, 3); // valid tuple --
 			//set dirty
 			info->dirtyBit = true;
 			//insert_one index in IndexManager if needed
@@ -350,9 +356,11 @@ bool RecordManager::CheckUnique(const string & DBName, const string & TableName,
 				{
 					if (condition.match(t))
 					{
-						cout << "Cannot insert duplicate key in " << TableName << "." << endl;
-						cout << ". The duplicate key value occurs in :" << endl;
-						cout << t << endl;
+						std::cout << "ERROR: Violation of UNIQUE KEY constraint '" +
+							TableName << "'." << endl;
+						std::cout << "The duplicate key value occurs in: "
+							<< t << ". The statement has been terminated." << endl;
+
 						return false;
 					}
 				}

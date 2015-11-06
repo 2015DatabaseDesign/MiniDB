@@ -5,12 +5,12 @@
 CatalogManager::CatalogManager() {
 	fCatalog.open(FCATALOG.c_str(), ios::in | ios::out | ios::binary);
 	if (!fCatalog.is_open()) {
-		cout << "Database File Not Found. Create Now!" << sizeof(char) << endl;
+		//cout << "Database File Not Found. Create Now!" << sizeof(char) << endl;
 		init(256);
 		fCatalog.open(FCATALOG.c_str(), ios::in | ios::out | ios::binary);
 		if (!fCatalog.is_open()) {
 			//No exception in construction.
-			cout << "Fail to create database file." << endl;
+			//cout << "Fail to create database file." << endl;
 			return;
 		}
 	}
@@ -61,7 +61,7 @@ bool CatalogManager::creatTable(string name, vector<Field> fields) {
 	if (name.length() > 22)
 		throw(CatalogException("Name is too long"));
 	if (findTable(name)) {
-		cout << name << " Table exist!" << endl;
+		//cout << name << " Table exist!" << endl; //---
 		return false;
 	}
 	int locationOfTable = findNextEmptyTable();
@@ -111,7 +111,7 @@ bool CatalogManager::creatTable(string name, vector<Field> fields) {
 	for (unsigned i = 1; i < 24; i++)
 		buffer[i] = 0;
 	fCatalog.write(buffer, 24);
-	cout << name << " table is created successfully!" << endl;
+	//cout << name << " table is created successfully!" << endl;
 	return true;
 }
 
@@ -275,7 +275,7 @@ bool CatalogManager::deleteAll(string _name) {
 		const int zero = 0;
 		fCatalog.seekp(table->locationOfTable + 0x20, ios::beg);
 		fCatalog.write((char *)&zero, sizeof(int));
-		cout << "Delete successfully! One table affected!" << endl;
+		//cout << "Delete successfully! One table affected!" << endl;
 		return true;
 	}
 	else {

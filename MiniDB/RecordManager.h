@@ -1,6 +1,6 @@
 #ifndef __RECORDMANAGER_H__
 #define __RECORDMANAGER_H__
-
+#define JUMPLENGTH	28
 #include <vector>
 #include <string>
 #include <deque>

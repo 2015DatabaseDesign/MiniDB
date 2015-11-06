@@ -53,7 +53,7 @@ public:
 
 	//the first parameter 'data' comes from blockinfo->cBlock
 	//the second parameter 'td' comes from Catalog manager
-	Page(char *data,const Table *td)
+	Page(char *data, const Table *td)
 	{
 		this->data = data;
 		this->tabledesc = td;
@@ -80,5 +80,5 @@ public:
 	Tuple ReadTuple(int index);
 
 	//set certain position of header to be set or reset
-	void SetHeader(int index, bool isSet);
+	void SetHeader(int index, unsigned char isSet);
 };
